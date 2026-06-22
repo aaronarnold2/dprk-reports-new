@@ -9,6 +9,6 @@ const PORT = process.env.PORT || 8080
 
 app.use(compression())
 app.use(express.static(join(__dirname, 'dist'), { maxAge: '1h' }))
-app.get('*', (req, res) => res.sendFile(join(__dirname, 'dist', 'index.html')))
+app.get('/{*path}', (req, res) => res.sendFile(join(__dirname, 'dist', 'index.html')))
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
