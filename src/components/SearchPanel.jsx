@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { exportCSV, exportJSON } from '../utils/export'
 import { getEntityName } from '../utils/entity'
+import SanctionBadge from './SanctionBadge'
 
 const DATE_FIELDS = ['date', 'birthDate', 'startDate', 'incorporationDate']
 
@@ -20,15 +21,21 @@ function parseToComparable(dateStr) {
   return null
 }
 
-export default function SearchPanel({ data, onSelect, onGraph }) {
-  const [query, setQuery] = useState('')
-  const [schemaFilter, setSchemaFilter] = useState('')
-  const [countryFilter, setCountryFilter] = useState('')
+export default function SearchPanel({ data, onSelect, onGraph, searchState, onSearchStateChange }) {
+  const [query, setQuery] = useState(searchState?.query || '')
+  const [schemaFilter, setSchemaFilter] = useState(searchState?.type || '')
+  const [countryFilter, setCountryFilter] = useState(searchState?.country || '')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(0)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const PAGE_SIZE = 50
+
+  useEffect(() => {
+    if (onSearchStateChange) {
+      onSearchStateChange({ query, type: schemaFilter, country: countryFilter })
+    }
+  }, [query, schemaFilter, countryFilter])
 
   const searchable = useMemo(() => {
     return data.entities
@@ -40,6 +47,7 @@ export default function SearchPanel({ data, onSelect, onGraph }) {
           Object.entries(e.properties).map(([k, v]) => [k.toLowerCase(), v.join(' ').toLowerCase()])
         ),
         _date: parseToComparable(extractDate(e)),
+        _sanctioned: data.sanctionedIds?.has(e.id) || false,
       }))
   }, [data])
 
@@ -150,10 +158,13 @@ export default function SearchPanel({ data, onSelect, onGraph }) {
 
       <div style={{ display: 'grid', gap: 6 }}>
         {paged.map(e => (
-          <div key={e.id} onClick={() => onSelect(e.id)} style={{ padding: '10px 14px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div key={e.id} onClick={() => onSelect(e.id)} style={{ padding: '10px 14px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'flex-start', borderLeft: e._sanctioned ? '3px solid var(--danger)' : '3px solid transparent' }}>
             <span className={`badge badge-${e.schema.toLowerCase()}`}>{e.schema}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600 }}>{getEntityName(e)}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontWeight: 600 }}>{getEntityName(e)}</span>
+                {e._sanctioned && <SanctionBadge size="small" />}
+              </div>
               {e.properties.alias && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>aka: {e.properties.alias.join(', ')}</div>}
               {e.properties.description && <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.properties.description[0]}</div>}
             </div>

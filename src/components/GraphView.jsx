@@ -1,6 +1,7 @@
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react'
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
 import { getEntityName } from '../utils/entity'
+import SanctionBadge from './SanctionBadge'
 
 const SCHEMA_COLORS = {
   Person: '#4f8ff7',
@@ -148,6 +149,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
       name: getEntityName(e),
       schema: e.schema,
       color: SCHEMA_COLORS[e.schema] || '#666',
+      sanctioned: data.sanctionedIds?.has(e.id) || false,
     }))
 
     const nodeSet = new Set(nodes.map(n => n.id))
@@ -216,9 +218,17 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
       const isHovered = n.id === hoveredNode
       const r = (isSelected ? 8 : 6) / transform.k
 
-      if (isSelected) {
+      if (n.sanctioned) {
         ctx.beginPath()
         ctx.arc(n.x, n.y, r + 3 / transform.k, 0, Math.PI * 2)
+        ctx.strokeStyle = '#e5534b'
+        ctx.lineWidth = 2 / transform.k
+        ctx.stroke()
+      }
+
+      if (isSelected) {
+        ctx.beginPath()
+        ctx.arc(n.x, n.y, r + (n.sanctioned ? 5 : 3) / transform.k, 0, Math.PI * 2)
         ctx.strokeStyle = '#fff'
         ctx.lineWidth = 2 / transform.k
         ctx.stroke()
@@ -360,6 +370,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
               <span className={`badge badge-${selectedEntity.schema.toLowerCase()}`}>{selectedEntity.schema}</span>
               <strong style={{ fontSize: 15 }}>{getEntityName(selectedEntity)}</strong>
+              {data.sanctionedIds?.has(selectedNode) && <SanctionBadge size="small" />}
             </div>
 
             <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>

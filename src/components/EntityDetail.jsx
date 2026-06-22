@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import { addBookmark, removeBookmark, isBookmarked } from '../utils/bookmarks'
 import { exportReport } from '../utils/export'
 import { getEntityName } from '../utils/entity'
+import SanctionBadge from './SanctionBadge'
 
 const LINK_FIELDS = new Set(['sourceUrl', 'website'])
 const HIDDEN_FIELDS = new Set(['proof'])
@@ -59,9 +60,10 @@ export default function EntityDetail({ data, entityId, onSelect, onGraph, bookma
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <span className={`badge badge-${entity.schema.toLowerCase()}`}>{entity.schema}</span>
             <h2 style={{ fontSize: 24 }}>{name}</h2>
+            {data.sanctionedIds?.has(entityId) && <SanctionBadge />}
           </div>
           {props.alias && <div style={{ color: 'var(--text-dim)', marginTop: 4 }}>Also known as: {props.alias.join(', ')}</div>}
           {props.fraudAlias && <div style={{ color: 'var(--danger)', marginTop: 2, fontSize: 13 }}>Fraudulent aliases: {props.fraudAlias.join(', ')}</div>}
