@@ -113,6 +113,76 @@ export default function AboutPage({ data }) {
         </p>
       </Section>
 
+      <Section title="REST API">
+        <p>
+          The DPRK Reports database is available via a REST API for programmatic access. All endpoints return JSON.
+        </p>
+
+        <h4>GET /api/stats</h4>
+        <p>Returns high-level database statistics: total entities, edges, sanctioned count, and breakdown by entity type.</p>
+        <pre><code>curl {window.location.origin}/api/stats</code></pre>
+
+        <h4>GET /api/search</h4>
+        <p>Search across all entity fields. Parameters:</p>
+        <ul>
+          <li><code>q</code> — Search query (matches names, aliases, descriptions, emails, addresses, etc.)</li>
+          <li><code>type</code> — Filter by entity type: Person, Company, Organization, Vessel, Event, Sanction, Document</li>
+          <li><code>country</code> — Filter by country code (ISO 3166-1 alpha-2, e.g. <code>kp</code>, <code>cn</code>)</li>
+          <li><code>sanctioned</code> — Filter by sanctions status: <code>true</code> or <code>false</code></li>
+          <li><code>limit</code> — Max results (default 50, max 500)</li>
+          <li><code>offset</code> — Pagination offset</li>
+        </ul>
+        <pre><code>curl "{window.location.origin}/api/search?q=KOMID&type=Company&limit=10"</code></pre>
+
+        <h4>GET /api/entity/:id</h4>
+        <p>Get full details of a specific entity by ID.</p>
+        <pre><code>curl {window.location.origin}/api/entity/ENTITY_ID</code></pre>
+
+        <h4>GET /api/entity/:id/connections</h4>
+        <p>Get all relationships for a specific entity — returns connected entities with relationship types and roles.</p>
+        <pre><code>curl {window.location.origin}/api/entity/ENTITY_ID/connections</code></pre>
+
+        <h4>GET /api/paths?from=ID&to=ID</h4>
+        <p>Find the shortest connection path between two entities using breadth-first search.</p>
+        <pre><code>curl "{window.location.origin}/api/paths?from=ENTITY_A&to=ENTITY_B"</code></pre>
+      </Section>
+
+      <Section title="MCP Server (AI Agent Integration)">
+        <p>
+          An <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener noreferrer">MCP (Model Context Protocol)</a> server
+          is included, enabling AI agents like Claude Code to query the DPRK Reports database directly as tools within their workflow.
+        </p>
+
+        <h4>Setup</h4>
+        <p>Add the following to your Claude Code MCP configuration (<code>~/.claude/claude_desktop_config.json</code> or project <code>.mcp.json</code>):</p>
+        <pre><code>{`{
+  "mcpServers": {
+    "dprk-reports": {
+      "command": "node",
+      "args": ["${window.location.pathname === '/' ? '' : window.location.pathname}mcp-server.js"],
+      "cwd": "/path/to/dprk-reports-new"
+    }
+  }
+}`}</code></pre>
+
+        <h4>Available Tools</h4>
+        <ul>
+          <li><strong>search_entities</strong> — Search for persons, companies, organizations, vessels, and events by keyword, type, country, or sanctions status.</li>
+          <li><strong>get_entity</strong> — Retrieve full details of a specific entity by ID.</li>
+          <li><strong>get_connections</strong> — Get all relationships for a specific entity.</li>
+          <li><strong>find_path</strong> — Find the shortest connection path between two entities.</li>
+          <li><strong>get_stats</strong> — Get database statistics.</li>
+        </ul>
+
+        <h4>Example Usage</h4>
+        <p>Once configured, an AI agent can query the database naturally:</p>
+        <ul>
+          <li>"Search for all sanctioned companies in China"</li>
+          <li>"What are the connections for Korea Mining Development Trading Corporation?"</li>
+          <li>"Find the path between Alejandro Cao de Benós and Korea Kwangson Banking Corporation"</li>
+        </ul>
+      </Section>
+
       <Section title="Download Dataset">
         <p>
           Download the complete processed dataset in JSON format. The file contains all {data.entities.length.toLocaleString()} entities
