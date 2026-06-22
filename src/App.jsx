@@ -44,7 +44,10 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh' }}>
       <header style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
-        <h1 style={{ fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap' }}>DPRK Sanctions Investigator</h1>
+        <a href="https://www.rusi.org/" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <img src="/rusi-logo-white.png" alt="RUSI" style={{ height: 36 }} />
+        </a>
+        <h1 style={{ fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap' }}>DPRK Reports</h1>
         <nav style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           {VIEWS.map(v => (
             <button key={v} className={v !== view ? 'secondary' : ''} onClick={() => setView(v)} style={{ textTransform: 'capitalize', padding: '5px 12px', fontSize: 13 }}>
