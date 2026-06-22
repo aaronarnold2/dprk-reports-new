@@ -67,6 +67,16 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
   const rafRef = useRef(null)
 
   const [canvasSize, setCanvasSize] = useState({ width: 900, height: DEFAULT_HEIGHT })
+  const [hiddenSchemas, setHiddenSchemas] = useState(new Set())
+
+  const toggleSchema = useCallback((schema) => {
+    setHiddenSchemas(prev => {
+      const next = new Set(prev)
+      if (next.has(schema)) next.delete(schema)
+      else next.add(schema)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     const container = containerRef.current
@@ -161,8 +171,8 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     return () => { sim.stop() }
   }, [activeIds, data])
 
-  // Redraw when selection/hover changes without restarting sim
-  useEffect(() => { draw() }, [selectedNode, hoveredNode, transform, canvasSize])
+  // Redraw when selection/hover/visibility changes without restarting sim
+  useEffect(() => { draw() }, [selectedNode, hoveredNode, transform, canvasSize, hiddenSchemas])
 
   function draw() {
     const canvas = canvasRef.current
@@ -182,8 +192,16 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     ctx.translate(transform.x, transform.y)
     ctx.scale(transform.k, transform.k)
 
+    const visibleNodeIds = new Set()
+    nodesRef.current.forEach(n => {
+      if (n.x != null && !hiddenSchemas.has(n.schema)) visibleNodeIds.add(n.id)
+    })
+
     linksRef.current.forEach(l => {
       if (!l.source?.x || !l.target?.x) return
+      const srcId = typeof l.source === 'object' ? l.source.id : l.source
+      const tgtId = typeof l.target === 'object' ? l.target.id : l.target
+      if (!visibleNodeIds.has(srcId) || !visibleNodeIds.has(tgtId)) return
       ctx.beginPath()
       ctx.moveTo(l.source.x, l.source.y)
       ctx.lineTo(l.target.x, l.target.y)
@@ -193,7 +211,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     })
 
     nodesRef.current.forEach(n => {
-      if (n.x == null) return
+      if (n.x == null || hiddenSchemas.has(n.schema)) return
       const isSelected = n.id === selectedNode
       const isHovered = n.id === hoveredNode
       const r = (isSelected ? 8 : 6) / transform.k
@@ -234,13 +252,13 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     const hitRadius = 10 / transform.k
     for (let i = nodesRef.current.length - 1; i >= 0; i--) {
       const n = nodesRef.current[i]
-      if (n.x == null) continue
+      if (n.x == null || hiddenSchemas.has(n.schema)) continue
       const dx = n.x - x
       const dy = n.y - y
       if (dx * dx + dy * dy < hitRadius * hitRadius) return n
     }
     return null
-  }, [screenToWorld, transform])
+  }, [screenToWorld, transform, hiddenSchemas])
 
   const getMousePos = (e) => {
     const rect = canvasRef.current.getBoundingClientRect()
@@ -312,13 +330,16 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
         <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>
           {nodesRef.current.length} nodes · {linksRef.current.length} edges
         </span>
-        <div style={{ display: 'flex', gap: 12 }}>
-          {Object.entries(SCHEMA_COLORS).filter(([s]) => nodesRef.current.some(n => n.schema === s)).map(([schema, color]) => (
-            <span key={schema} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 12 }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
-              {schema}
-            </span>
-          ))}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {Object.entries(SCHEMA_COLORS).filter(([s]) => nodesRef.current.some(n => n.schema === s)).map(([schema, color]) => {
+            const hidden = hiddenSchemas.has(schema)
+            return (
+              <span key={schema} onClick={() => toggleSchema(schema)} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 12, cursor: 'pointer', opacity: hidden ? 0.35 : 1, textDecoration: hidden ? 'line-through' : 'none', userSelect: 'none', padding: '2px 6px', borderRadius: 4, background: hidden ? 'transparent' : 'var(--surface2)' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
+                {schema}
+              </span>
+            )
+          })}
         </div>
         <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>Click node to inspect · Scroll to zoom · Drag to pan</span>
       </div>
