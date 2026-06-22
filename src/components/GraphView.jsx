@@ -21,7 +21,7 @@ const FIELD_LABELS = {
   address: 'Address', phone: 'Phone', email: 'Email', birthDate: 'Date of Birth',
   gender: 'Gender', status: 'Status', description: 'Description', notes: 'Notes',
   imoNumber: 'IMO Number', mmsi: 'MMSI', flag: 'Flag', type: 'Type',
-  idNumber: 'ID Numbers', website: 'Website', nkproUrl: 'NK Pro',
+  idNumber: 'ID Numbers', website: 'Website',
   number: 'Number', date: 'Date', startDate: 'Start Date', endDate: 'End Date',
   summary: 'Summary', keywords: 'Keywords', location: 'Location',
   unscId: 'UNSC ID', program: 'Program', recordId: 'Record ID',
@@ -361,8 +361,8 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
                 <div key={key} style={{ marginBottom: 8 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{FIELD_LABELS[key] || key}</div>
                   <div style={{ fontSize: 13 }}>
-                    {key === 'nkproUrl' || key === 'sourceUrl' || key === 'website' ? (
-                      <a href={values[0]} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{key === 'nkproUrl' ? 'View on NK Pro' : values[0]}</a>
+                    {key === 'sourceUrl' || key === 'website' ? (
+                      <a href={values[0]} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{values[0]}</a>
                     ) : key === 'country' || key === 'nationality' || key === 'flag' ? (
                       values.map(v => v.toUpperCase()).join(', ')
                     ) : key === 'description' ? (

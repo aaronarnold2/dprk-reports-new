@@ -3,11 +3,11 @@ import { addBookmark, removeBookmark, isBookmarked } from '../utils/bookmarks'
 import { exportReport } from '../utils/export'
 import { getEntityName } from '../utils/entity'
 
-const LINK_FIELDS = new Set(['nkproUrl', 'sourceUrl', 'website'])
+const LINK_FIELDS = new Set(['sourceUrl', 'website'])
 const HIDDEN_FIELDS = new Set(['proof'])
 
 const FIELD_LABELS = {
-  name: 'Name', alias: 'Aliases', nkproUrl: 'NK Pro', nationality: 'Nationality',
+  name: 'Name', alias: 'Aliases', nationality: 'Nationality',
   country: 'Country', address: 'Address', phone: 'Phone', email: 'Email',
   birthDate: 'Date of Birth', gender: 'Gender', status: 'Status',
   description: 'Description', notes: 'Notes', idNumber: 'ID Numbers',
@@ -93,7 +93,7 @@ export default function EntityDetail({ data, entityId, onSelect, onGraph, bookma
                     values.map((v, i) => (
                       <span key={i}>
                         {i > 0 && ', '}
-                        <a href={v} target="_blank" rel="noopener noreferrer">{key === 'nkproUrl' ? 'View on NK Pro' : v}</a>
+                        <a href={v} target="_blank" rel="noopener noreferrer">{v}</a>
                       </span>
                     ))
                   ) : key === 'keywords' ? (
