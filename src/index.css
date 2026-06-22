@@ -1,0 +1,78 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242836;
+  --border: #2e3345;
+  --text: #e1e4ed;
+  --text-dim: #8b90a0;
+  --accent: #4f8ff7;
+  --accent-dim: #2a4a8a;
+  --danger: #e5534b;
+  --warning: #d29922;
+  --success: #3fb950;
+  --person: #4f8ff7;
+  --company: #d29922;
+  --organization: #e5534b;
+  --vessel: #3fb950;
+  --event: #bc8cff;
+  --identification: #8b90a0;
+  --sanction: #e5534b;
+  --document: #8b90a0;
+  --documentation: #6e7681;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+input, select {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+}
+input:focus, select:focus { border-color: var(--accent); }
+
+button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+button:hover { opacity: 0.9; }
+button.secondary {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-person { background: var(--person); color: #fff; }
+.badge-company { background: var(--company); color: #000; }
+.badge-organization { background: var(--organization); color: #fff; }
+.badge-vessel { background: var(--vessel); color: #000; }
+.badge-event { background: var(--event); color: #000; }
+.badge-identification { background: var(--identification); color: #000; }
+.badge-sanction { background: var(--danger); color: #fff; }
+.badge-document, .badge-documentation { background: var(--document); color: #000; }
