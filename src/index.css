@@ -76,3 +76,10 @@ button.secondary {
 .badge-identification { background: var(--identification); color: #000; }
 .badge-sanction { background: var(--danger); color: #fff; }
 .badge-document, .badge-documentation { background: var(--document); color: #000; }
+
+.about-content p { margin-bottom: 12px; }
+.about-content h4 { margin-top: 20px; margin-bottom: 8px; color: var(--accent); font-size: 15px; }
+.about-content ul { margin: 8px 0 12px 20px; }
+.about-content li { margin-bottom: 4px; }
+.about-content code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+.about-content a { color: var(--accent); }

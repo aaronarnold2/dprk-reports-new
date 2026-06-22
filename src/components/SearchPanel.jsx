@@ -2,10 +2,30 @@ import React, { useState, useMemo } from 'react'
 import { exportCSV, exportJSON } from '../utils/export'
 import { getEntityName } from '../utils/entity'
 
+const DATE_FIELDS = ['date', 'birthDate', 'startDate', 'incorporationDate']
+
+function extractDate(entity) {
+  for (const f of DATE_FIELDS) {
+    const val = entity.properties[f]?.[0]
+    if (val) return val
+  }
+  return null
+}
+
+function parseToComparable(dateStr) {
+  if (!dateStr) return null
+  if (/^\d{4}$/.test(dateStr)) return dateStr + '-01-01'
+  if (/^\d{4}-\d{2}$/.test(dateStr)) return dateStr + '-01'
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return dateStr.slice(0, 10)
+  return null
+}
+
 export default function SearchPanel({ data, onSelect, onGraph }) {
   const [query, setQuery] = useState('')
   const [schemaFilter, setSchemaFilter] = useState('')
   const [countryFilter, setCountryFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(0)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const PAGE_SIZE = 50
@@ -19,6 +39,7 @@ export default function SearchPanel({ data, onSelect, onGraph }) {
         _fields: Object.fromEntries(
           Object.entries(e.properties).map(([k, v]) => [k.toLowerCase(), v.join(' ').toLowerCase()])
         ),
+        _date: parseToComparable(extractDate(e)),
       }))
   }, [data])
 
@@ -46,10 +67,12 @@ export default function SearchPanel({ data, onSelect, onGraph }) {
         const cts = [...(e.properties.country || []), ...(e.properties.nationality || [])]
         if (!cts.includes(countryFilter)) return false
       }
+      if (dateFrom && (!e._date || e._date < dateFrom)) return false
+      if (dateTo && (!e._date || e._date > dateTo)) return false
       if (!q) return true
       return matchQuery(q, e)
     })
-  }, [query, schemaFilter, countryFilter, searchable])
+  }, [query, schemaFilter, countryFilter, dateFrom, dateTo, searchable])
 
   const paged = results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
   const totalPages = Math.ceil(results.length / PAGE_SIZE)
@@ -72,6 +95,16 @@ export default function SearchPanel({ data, onSelect, onGraph }) {
           <option value="">All Countries</option>
           {countries.map(([c, n]) => <option key={c} value={c}>{c.toUpperCase()} ({n})</option>)}
         </select>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <label style={{ fontSize: 12, color: 'var(--text-dim)' }}>Date from</label>
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} />
+        <label style={{ fontSize: 12, color: 'var(--text-dim)' }}>to</label>
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} />
+        {(dateFrom || dateTo) && (
+          <button className="secondary" onClick={() => { setDateFrom(''); setDateTo('') }} style={{ fontSize: 12, padding: '4px 8px' }}>Clear dates</button>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>

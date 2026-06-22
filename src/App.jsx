@@ -4,12 +4,12 @@ import SearchPanel from './components/SearchPanel'
 import EntityDetail from './components/EntityDetail'
 import GraphView from './components/GraphView'
 import MapView from './components/MapView'
-import TimelineView from './components/TimelineView'
 import BookmarkPanel from './components/BookmarkPanel'
 import PathFinder from './components/PathFinder'
+import AboutPage from './components/AboutPage'
 import { getBookmarks } from './utils/bookmarks'
 
-const VIEWS = ['dashboard', 'search', 'graph', 'map', 'timeline', 'paths', 'bookmarks']
+const VIEWS = ['dashboard', 'search', 'graph', 'map', 'paths', 'bookmarks', 'guide']
 
 export default function App() {
   const [data, setData] = useState(null)
@@ -48,7 +48,7 @@ export default function App() {
         <nav style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           {VIEWS.map(v => (
             <button key={v} className={v !== view ? 'secondary' : ''} onClick={() => setView(v)} style={{ textTransform: 'capitalize', padding: '5px 12px', fontSize: 13 }}>
-              {v}
+              {v === 'guide' ? 'Guide & Download' : v}
             </button>
           ))}
         </nav>
@@ -64,9 +64,9 @@ export default function App() {
         {view === 'detail' && selectedEntity && <EntityDetail data={data} entityId={selectedEntity} onSelect={openEntity} onGraph={openGraph} bookmarks={bookmarks} setBookmarks={setBookmarks} />}
         {view === 'graph' && <GraphView data={data} entityIds={graphEntities} onSelect={openEntity} />}
         {view === 'map' && <MapView data={data} onSelect={openEntity} />}
-        {view === 'timeline' && <TimelineView data={data} onSelect={openEntity} />}
         {view === 'paths' && <PathFinder data={data} onSelect={openEntity} onGraph={openGraph} />}
         {view === 'bookmarks' && <BookmarkPanel bookmarks={bookmarks} setBookmarks={setBookmarks} onSelect={openEntity} onGraph={openGraph} />}
+        {view === 'guide' && <AboutPage data={data} />}
       </main>
     </div>
   )

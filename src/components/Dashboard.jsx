@@ -65,6 +65,14 @@ export default function Dashboard({ data, onSelect, onGraph }) {
         </div>
       </div>
 
+      <div style={{ background: 'var(--surface)', borderRadius: 8, padding: 24, marginTop: 24, lineHeight: 1.7, fontSize: 14 }} className="about-content">
+        <h3 style={{ marginBottom: 12 }}>About the DPRK Reports Database</h3>
+        <p>The objective of this database is to provide national authorities and private-sector institutions with information that can assist with sanctions implementation efforts such as due diligence and compliance.</p>
+        <p>The DPRK Reports database contains structured information relating to the activities of entities that assist North Korea to develop prohibited weapons programmes and evade sanctions. The data is sourced from the <a href="https://www.un.org/securitycouncil/sanctions/1718/panel_experts/reports" target="_blank" rel="noopener noreferrer">United Nations Panel of Experts reports</a>, from 2010 to 2023, as well as the associated <a href="https://main.un.org/securitycouncil/en/sanctions/1718/resolutions" target="_blank" rel="noopener noreferrer">UN sanctions resolutions</a>.</p>
+        <p>The database includes profiles of the persons, companies, organizations, and vessels that are mentioned in the reports, and contains information such as names, aliases, locations, contact details and sanction designation status. The database also records the relationships between entities and their involvement or relationship to specific events.</p>
+        <p>The database was developed by the <a href="https://www.rusi.org/" target="_blank" rel="noopener noreferrer">Royal United Services Institute (RUSI)</a> in partnership with the <a href="https://www.korearisk.com/" target="_blank" rel="noopener noreferrer">Korea Risk Group</a>.</p>
+      </div>
+
     </div>
   )
 }
