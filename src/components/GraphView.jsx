@@ -49,12 +49,13 @@ function getDefaultIds(data) {
   return [...seedIds].slice(0, 150)
 }
 
-const WIDTH = 900
-const HEIGHT = 600
+const DEFAULT_HEIGHT = 600
 
 export default function GraphView({ data, entityIds: initialEntityIds, onSelect }) {
   const canvasRef = useRef()
+  const containerRef = useRef()
   const simRef = useRef(null)
+  const sizeRef = useRef({ width: 900, height: DEFAULT_HEIGHT })
   const [selectedNode, setSelectedNode] = useState(null)
   const [hoveredNode, setHoveredNode] = useState(null)
   const [activeIds, setActiveIds] = useState(() => new Set(initialEntityIds || getDefaultIds(data)))
@@ -64,6 +65,22 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
   const dragRef = useRef(null)
   const panRef = useRef(null)
   const rafRef = useRef(null)
+
+  const [canvasSize, setCanvasSize] = useState({ width: 900, height: DEFAULT_HEIGHT })
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const observer = new ResizeObserver(entries => {
+      const { width } = entries[0].contentRect
+      if (width > 0) {
+        sizeRef.current = { width, height: DEFAULT_HEIGHT }
+        setCanvasSize({ width, height: DEFAULT_HEIGHT })
+      }
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
     if (initialEntityIds) {
@@ -134,7 +151,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     const sim = forceSimulation(nodes)
       .force('link', forceLink(links).id(d => d.id).distance(60))
       .force('charge', forceManyBody().strength(-120))
-      .force('center', forceCenter(WIDTH / 2, HEIGHT / 2))
+      .force('center', forceCenter(sizeRef.current.width / 2, sizeRef.current.height / 2))
       .force('collide', forceCollide(10))
       .on('tick', draw)
 
@@ -145,21 +162,21 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
   }, [activeIds, data])
 
   // Redraw when selection/hover changes without restarting sim
-  useEffect(() => { draw() }, [selectedNode, hoveredNode, transform])
+  useEffect(() => { draw() }, [selectedNode, hoveredNode, transform, canvasSize])
 
   function draw() {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     const dpr = window.devicePixelRatio || 1
-    canvas.width = WIDTH * dpr
-    canvas.height = HEIGHT * dpr
-    canvas.style.width = WIDTH + 'px'
-    canvas.style.height = HEIGHT + 'px'
+    canvas.width = sizeRef.current.width * dpr
+    canvas.height = sizeRef.current.height * dpr
+    canvas.style.width = sizeRef.current.width + 'px'
+    canvas.style.height = sizeRef.current.height + 'px'
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     ctx.fillStyle = '#1a1d27'
-    ctx.fillRect(0, 0, WIDTH, HEIGHT)
+    ctx.fillRect(0, 0, sizeRef.current.width, sizeRef.current.height)
 
     ctx.save()
     ctx.translate(transform.x, transform.y)
@@ -306,7 +323,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
         <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>Click node to inspect · Scroll to zoom · Drag to pan</span>
       </div>
       <div style={{ display: 'flex', gap: 16 }}>
-        <div style={{ flex: 1, background: 'var(--surface)', borderRadius: 8, overflow: 'hidden', minWidth: 0 }}>
+        <div ref={containerRef} style={{ flex: 1, background: 'var(--surface)', borderRadius: 8, overflow: 'hidden', minWidth: 0 }}>
           <canvas
             ref={canvasRef}
             style={{ display: 'block', cursor: 'grab' }}
@@ -318,7 +335,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
           />
         </div>
         {selectedEntity && (
-          <div style={{ width: 340, flexShrink: 0, background: 'var(--surface)', borderRadius: 8, padding: 16, height: 600, overflowY: 'auto' }}>
+          <div style={{ width: 340, flexShrink: 0, background: 'var(--surface)', borderRadius: 8, padding: 16, height: DEFAULT_HEIGHT, overflowY: 'auto' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
               <span className={`badge badge-${selectedEntity.schema.toLowerCase()}`}>{selectedEntity.schema}</span>
               <strong style={{ fontSize: 15 }}>{getEntityName(selectedEntity)}</strong>
