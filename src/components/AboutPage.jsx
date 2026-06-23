@@ -150,37 +150,71 @@ export default function AboutPage({ data }) {
       <Section title="MCP Server (AI Agent Integration)">
         <p>
           An <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener noreferrer">MCP (Model Context Protocol)</a> server
-          is included, enabling AI agents like Claude Code to query the DPRK Reports database directly as tools within their workflow.
+          is included, enabling AI agents like Claude to query the DPRK Reports database directly as tools within their workflow.
+          MCP is an open standard that allows AI assistants to interact with external data sources through a structured tool interface.
         </p>
 
-        <h4>Setup</h4>
-        <p>Add the following to your Claude Code MCP configuration (<code>~/.claude/claude_desktop_config.json</code> or project <code>.mcp.json</code>):</p>
+        <h4>Prerequisites</h4>
+        <ul>
+          <li>Node.js 18 or later installed</li>
+          <li>The repository cloned locally: <code>git clone https://github.com/aaronarnold2/dprk-reports-new.git</code></li>
+          <li>Dependencies installed: <code>cd dprk-reports-new && npm install --legacy-peer-deps</code></li>
+          <li>Production build (the MCP server reads data from <code>dist/</code>): <code>npm run build</code></li>
+        </ul>
+
+        <h4>Setup with Claude Desktop</h4>
+        <p>Edit your Claude Desktop configuration file:</p>
+        <ul>
+          <li>macOS: <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+          <li>Windows: <code>%APPDATA%\Claude\claude_desktop_config.json</code></li>
+        </ul>
+        <p>Add the following (replace <code>/path/to/dprk-reports-new</code> with the actual path where you cloned the repo):</p>
         <pre><code>{`{
   "mcpServers": {
     "dprk-reports": {
       "command": "node",
-      "args": ["${window.location.pathname === '/' ? '' : window.location.pathname}mcp-server.js"],
+      "args": ["mcp-server.js"],
       "cwd": "/path/to/dprk-reports-new"
     }
   }
 }`}</code></pre>
+        <p>Restart Claude Desktop. You should see "dprk-reports" listed as a connected MCP server with 5 available tools.</p>
+
+        <h4>Setup with Claude Code (CLI)</h4>
+        <p>Create a <code>.mcp.json</code> file in your project directory:</p>
+        <pre><code>{`{
+  "mcpServers": {
+    "dprk-reports": {
+      "command": "node",
+      "args": ["/path/to/dprk-reports-new/mcp-server.js"]
+    }
+  }
+}`}</code></pre>
+        <p>Or add it globally in <code>~/.claude/settings.json</code> under the <code>mcpServers</code> key.</p>
 
         <h4>Available Tools</h4>
         <ul>
-          <li><strong>search_entities</strong> — Search for persons, companies, organizations, vessels, and events by keyword, type, country, or sanctions status.</li>
-          <li><strong>get_entity</strong> — Retrieve full details of a specific entity by ID.</li>
-          <li><strong>get_connections</strong> — Get all relationships for a specific entity.</li>
-          <li><strong>find_path</strong> — Find the shortest connection path between two entities.</li>
-          <li><strong>get_stats</strong> — Get database statistics.</li>
+          <li><strong>search_entities</strong> — Search for persons, companies, organizations, vessels, and events. Accepts: <code>q</code> (search query), <code>type</code> (Person, Company, Organization, Vessel, Event, Sanction, Document), <code>country</code> (ISO country code), <code>sanctioned</code> (true/false), <code>limit</code>, <code>offset</code>.</li>
+          <li><strong>get_entity</strong> — Retrieve full details of a specific entity by its 40-character hex ID. Returns all properties and sanctions status.</li>
+          <li><strong>get_connections</strong> — Get all relationships for an entity. Returns connected entities with relationship schema, role, and type.</li>
+          <li><strong>find_path</strong> — Find the shortest connection path between two entities using breadth-first search. Returns the full chain of entities and relationship types.</li>
+          <li><strong>get_stats</strong> — Get high-level database statistics: total entities, edges, sanctioned count, and breakdown by schema type.</li>
         </ul>
 
-        <h4>Example Usage</h4>
-        <p>Once configured, an AI agent can query the database naturally:</p>
+        <h4>Example Prompts</h4>
+        <p>Once configured, you can ask the AI agent questions like:</p>
         <ul>
-          <li>"Search for all sanctioned companies in China"</li>
-          <li>"What are the connections for Korea Mining Development Trading Corporation?"</li>
-          <li>"Find the path between Alejandro Cao de Benós and Korea Kwangson Banking Corporation"</li>
+          <li>"Search the DPRK Reports database for all sanctioned companies based in China"</li>
+          <li>"Look up the entity Korea Mining Development Trading Corporation and show me all its connections"</li>
+          <li>"Find the connection path between Alejandro Cao de Benós and Korea Kwangson Banking Corporation"</li>
+          <li>"How many vessels are in the DPRK Reports database? Show me some that have fraudulent IMO numbers"</li>
+          <li>"Find all persons connected to arms-related events in Syria"</li>
         </ul>
+
+        <h4>Verifying the Server</h4>
+        <p>To test that the MCP server is working, run:</p>
+        <pre><code>npm run mcp</code></pre>
+        <p>The server communicates via stdin/stdout using the JSON-RPC protocol. If it starts without errors, it is ready for use.</p>
       </Section>
 
       <Section title="Download Dataset">
