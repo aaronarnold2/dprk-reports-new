@@ -11,6 +11,8 @@ COPY package*.json ./
 RUN npm ci --legacy-peer-deps --omit=dev
 COPY server.js .
 COPY mcp-server.js .
+COPY src/mcp-tools.js ./src/mcp-tools.js
+COPY src/api-metadata.js ./src/api-metadata.js
 COPY src/utils/dataLoader.js ./src/utils/dataLoader.js
 COPY src/utils/entity.js ./src/utils/entity.js
 COPY --from=build /app/dist ./dist
