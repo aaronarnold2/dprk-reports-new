@@ -3,7 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DPRK Reports</title>
+    <title>DPRK Reports — DPRK Sanctions-Evasion Network Database</title>
+    <meta name="description" content="Investigative database of the DPRK (North Korea) sanctions-evasion network: 26,187 entities and 58,267 relationships from UN Panel of Experts reports (2010–2023). Search, network graph, map, pathfinding, REST API, and MCP access for AI agents." />
+    <meta name="keywords" content="DPRK, North Korea, sanctions, sanctions evasion, UN Panel of Experts, front companies, vessels, proliferation finance, RUSI, Korea Risk Group, Follow the Money" />
+    <meta name="author" content="Royal United Services Institute (RUSI); Korea Risk Group" />
+    <link rel="canonical" href="https://dprk-reports.org/" />
+
+    <!-- Open Graph / social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DPRK Reports" />
+    <meta property="og:title" content="DPRK Reports — DPRK Sanctions-Evasion Network Database" />
+    <meta property="og:description" content="26,187 entities and 58,267 relationships from UN Panel of Experts reports (2010–2023). Search, graph, map, REST API, and MCP access for AI agents." />
+    <meta property="og:url" content="https://dprk-reports.org/" />
+    <meta name="twitter:card" content="summary" />
+
+    <!-- Agent / API discovery -->
+    <link rel="alternate" type="application/json" href="/.well-known/openapi.json" title="OpenAPI specification" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
+
+    <!-- Structured data: describe the dataset for crawlers and agents -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Dataset",
+      "name": "DPRK Reports Database",
+      "description": "Structured database of the DPRK (North Korea) sanctions-evasion network — persons, companies, organizations, vessels, events, and sanctions designations — compiled from United Nations Panel of Experts reports (2010–2023).",
+      "url": "https://dprk-reports.org/",
+      "keywords": ["DPRK", "North Korea", "sanctions evasion", "UN Panel of Experts", "proliferation finance"],
+      "temporalCoverage": "2010/2023",
+      "creator": [
+        { "@type": "Organization", "name": "Royal United Services Institute (RUSI)", "url": "https://www.rusi.org/" },
+        { "@type": "Organization", "name": "Korea Risk Group", "url": "https://www.korearisk.com/" }
+      ],
+      "isBasedOn": "https://www.un.org/securitycouncil/sanctions/1718/panel_experts/reports",
+      "distribution": [
+        { "@type": "DataDownload", "encodingFormat": "application/json", "contentUrl": "https://dprk-reports.org/data.json" },
+        { "@type": "DataDownload", "name": "REST API", "encodingFormat": "application/json", "contentUrl": "https://dprk-reports.org/api" },
+        { "@type": "DataDownload", "name": "OpenAPI specification", "encodingFormat": "application/json", "contentUrl": "https://dprk-reports.org/.well-known/openapi.json" }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -16,8 +16,9 @@ Developed by the [Royal United Services Institute (RUSI)](https://www.rusi.org/)
 - **Bookmarks** — Save entities of interest with notes, persisted in browser localStorage
 - **Sanctions Indicators** — Designated entities are visually marked throughout the app
 - **Shareable URLs** — Every view encodes its state in the URL for sharing with colleagues
-- **REST API** — Programmatic access to search, entity details, connections, and pathfinding
-- **MCP Server** — AI agent integration via the Model Context Protocol
+- **REST API** — Programmatic access to search, entity details, connections, and pathfinding. CORS-enabled and documented by an OpenAPI 3.1 spec
+- **Remote MCP Server** — AI agents connect to a hosted Streamable-HTTP endpoint (`/mcp`) — no cloning required; a stdio server is also available
+- **Agent Discovery** — `llms.txt`, an AI-crawler-friendly `robots.txt`, `schema.org` Dataset metadata, and per-IP rate limiting
 
 ## Getting Started
 
@@ -47,7 +48,7 @@ The production server runs on port 8080 (configurable via `PORT` environment var
 
 ## REST API
 
-All endpoints return JSON.
+All endpoints return JSON and are CORS-enabled (callable from any origin). A machine-readable **OpenAPI 3.1** spec is served at `GET /.well-known/openapi.json`. The hosted API is rate limited to **120 requests/min per IP** (HTTP 429 with `Retry-After` when exceeded; override with the `RATE_LIMIT_API` env var).
 
 | Endpoint | Description |
 |---|---|
@@ -75,15 +76,36 @@ curl "http://localhost:8080/api/paths?from=ENTITY_A_ID&to=ENTITY_B_ID"
 
 ## MCP Server (AI Agent Integration)
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server is included, enabling AI agents like Claude to query the database directly as tools.
+An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server lets AI agents like Claude query the database directly as tools.
 
-### Setup
+### Remote server (recommended — no installation)
 
-1. Clone the repo and install dependencies (see above)
-2. Build the project: `npm run build`
-3. Configure your MCP client
+The MCP server is hosted over **Streamable HTTP** at `https://dprk-reports.org/mcp`. Any MCP client connects to that URL — no cloning, no local build. It runs statelessly (POST per request) and is rate limited to **60 requests/min per IP** (override with `RATE_LIMIT_MCP`).
 
-**Claude Desktop** — edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+**Claude Code:**
+
+```bash
+claude mcp add --transport http dprk-reports https://dprk-reports.org/mcp
+```
+
+…or add to `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "dprk-reports": {
+      "type": "http",
+      "url": "https://dprk-reports.org/mcp"
+    }
+  }
+}
+```
+
+**Claude Desktop:** Settings → Connectors → Add custom connector → enter `https://dprk-reports.org/mcp`.
+
+### Local server (stdio) — alternative
+
+To run the server yourself: clone the repo, install dependencies, and build (`npm run build`, since the stdio server reads data from `dist/`). Then configure your MCP client — for **Claude Desktop**, edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -97,18 +119,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server is in
 }
 ```
 
-**Claude Code** — create `.mcp.json` in your project:
-
-```json
-{
-  "mcpServers": {
-    "dprk-reports": {
-      "command": "node",
-      "args": ["/path/to/dprk-reports-new/mcp-server.js"]
-    }
-  }
-}
-```
+Verify it starts with `npm run mcp` (communicates via stdin/stdout using JSON-RPC).
 
 ### Available Tools
 
@@ -129,13 +140,17 @@ Once configured, ask your AI agent:
 - "Find the connection path between Alejandro Cao de Benós and Korea Kwangson Banking Corporation"
 - "How many vessels are in the database? Show me some with fraudulent IMO numbers"
 
-### Verify
+## Machine-Readable Discovery
 
-```bash
-npm run mcp
-```
+The deployed site publishes standard files so AI agents and crawlers can discover its capabilities automatically:
 
-The server communicates via stdin/stdout using JSON-RPC. If it starts without errors, it is ready.
+| Path | Description |
+|---|---|
+| `/llms.txt` | Concise, LLM-friendly description of the dataset and its endpoints |
+| `/.well-known/openapi.json` | OpenAPI 3.1 specification for the REST API |
+| `/robots.txt` | Explicitly welcomes AI/agent crawlers (GPTBot, ClaudeBot, PerplexityBot, and others) |
+
+The app's HTML also embeds [schema.org `Dataset`](https://schema.org/Dataset) structured data (JSON-LD), and all API and MCP responses are CORS-enabled.
 
 ## Deploy to Google Cloud Run
 

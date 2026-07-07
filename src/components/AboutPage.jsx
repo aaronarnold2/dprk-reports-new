@@ -1,6 +1,10 @@
 import React from 'react'
 
 export default function AboutPage({ data }) {
+  // Canonical public address — used in copy/paste API, MCP, and discovery URLs
+  // so they are correct regardless of where the guide is being viewed.
+  const CANONICAL = 'https://dprk-reports.org'
+
   const handleDownload = () => {
     const a = document.createElement('a')
     a.href = '/data.json'
@@ -115,12 +119,18 @@ export default function AboutPage({ data }) {
 
       <Section title="REST API">
         <p>
-          The DPRK Reports database is available via a REST API for programmatic access. All endpoints return JSON.
+          The DPRK Reports database is available via a REST API for programmatic access. All endpoints return JSON,
+          are <strong>CORS-enabled</strong> (callable from browser-based tools and agents on any origin), and are
+          described by an <strong>OpenAPI 3.1</strong> specification at <code>{CANONICAL}/.well-known/openapi.json</code>.
+        </p>
+        <p style={{ fontSize: 13, opacity: 0.85 }}>
+          The hosted API is rate limited to <strong>120 requests per minute per IP</strong>; exceeding it returns
+          HTTP 429 with a <code>Retry-After</code> header.
         </p>
 
         <h4>GET /api/stats</h4>
         <p>Returns high-level database statistics: total entities, edges, sanctioned count, and breakdown by entity type.</p>
-        <pre><code>curl {window.location.origin}/api/stats</code></pre>
+        <pre><code>curl {CANONICAL}/api/stats</code></pre>
 
         <h4>GET /api/search</h4>
         <p>Search across all entity fields. Parameters:</p>
@@ -132,43 +142,67 @@ export default function AboutPage({ data }) {
           <li><code>limit</code> — Max results (default 50, max 500)</li>
           <li><code>offset</code> — Pagination offset</li>
         </ul>
-        <pre><code>curl "{window.location.origin}/api/search?q=KOMID&type=Company&limit=10"</code></pre>
+        <pre><code>curl "{CANONICAL}/api/search?q=KOMID&type=Company&limit=10"</code></pre>
 
         <h4>GET /api/entity/:id</h4>
         <p>Get full details of a specific entity by ID.</p>
-        <pre><code>curl {window.location.origin}/api/entity/ENTITY_ID</code></pre>
+        <pre><code>curl {CANONICAL}/api/entity/ENTITY_ID</code></pre>
 
         <h4>GET /api/entity/:id/connections</h4>
         <p>Get all relationships for a specific entity — returns connected entities with relationship types and roles.</p>
-        <pre><code>curl {window.location.origin}/api/entity/ENTITY_ID/connections</code></pre>
+        <pre><code>curl {CANONICAL}/api/entity/ENTITY_ID/connections</code></pre>
 
         <h4>GET /api/paths?from=ID&to=ID</h4>
         <p>Find the shortest connection path between two entities using breadth-first search.</p>
-        <pre><code>curl "{window.location.origin}/api/paths?from=ENTITY_A&to=ENTITY_B"</code></pre>
+        <pre><code>curl "{CANONICAL}/api/paths?from=ENTITY_A&to=ENTITY_B"</code></pre>
       </Section>
 
       <Section title="MCP Server (AI Agent Integration)">
         <p>
           An <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener noreferrer">MCP (Model Context Protocol)</a> server
-          is included, enabling AI agents like Claude to query the DPRK Reports database directly as tools within their workflow.
-          MCP is an open standard that allows AI assistants to interact with external data sources through a structured tool interface.
+          lets AI agents like Claude query the DPRK Reports database directly as tools. MCP is an open standard for connecting
+          AI assistants to external data sources through a structured tool interface.
         </p>
 
-        <h4>Prerequisites</h4>
+        <h4>Remote server — recommended, no installation</h4>
+        <p>
+          The MCP server is hosted over Streamable HTTP at <code>{CANONICAL}/mcp</code>. Any MCP-compatible
+          client can connect to that URL directly — no cloning, no local build.
+        </p>
+        <p><strong>Claude Code</strong> — add it with one command:</p>
+        <pre><code>{`claude mcp add --transport http dprk-reports ${CANONICAL}/mcp`}</code></pre>
+        <p>…or add it to a <code>.mcp.json</code> file in your project:</p>
+        <pre><code>{`{
+  "mcpServers": {
+    "dprk-reports": {
+      "type": "http",
+      "url": "${CANONICAL}/mcp"
+    }
+  }
+}`}</code></pre>
+        <p>
+          <strong>Claude Desktop</strong> — open <strong>Settings → Connectors → Add custom connector</strong> and enter
+          the URL <code>{CANONICAL}/mcp</code>.
+        </p>
+        <p style={{ fontSize: 13, opacity: 0.85 }}>
+          The hosted endpoint is rate limited to <strong>60 requests per minute per IP</strong>; exceeding it returns a
+          JSON-RPC error. It is stateless, so use POST (the client handles this automatically).
+        </p>
+
+        <h4>Local server (stdio) — alternative</h4>
+        <p>Prefer to run the server yourself? A stdio version is also available. Prerequisites:</p>
         <ul>
           <li>Node.js 18 or later installed</li>
-          <li>The repository cloned locally: <code>git clone https://github.com/aaronarnold2/dprk-reports-new.git</code></li>
+          <li>Repository cloned: <code>git clone https://github.com/aaronarnold2/dprk-reports-new.git</code></li>
           <li>Dependencies installed: <code>cd dprk-reports-new && npm install --legacy-peer-deps</code></li>
-          <li>Production build (the MCP server reads data from <code>dist/</code>): <code>npm run build</code></li>
+          <li>Production build (the stdio server reads data from <code>dist/</code>): <code>npm run build</code></li>
         </ul>
-
-        <h4>Setup with Claude Desktop</h4>
-        <p>Edit your Claude Desktop configuration file:</p>
+        <p>Add the server to your Claude Desktop config file:</p>
         <ul>
           <li>macOS: <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
           <li>Windows: <code>%APPDATA%\Claude\claude_desktop_config.json</code></li>
         </ul>
-        <p>Add the following (replace <code>/path/to/dprk-reports-new</code> with the actual path where you cloned the repo):</p>
+        <p>Replace <code>/path/to/dprk-reports-new</code> with the path where you cloned the repo:</p>
         <pre><code>{`{
   "mcpServers": {
     "dprk-reports": {
@@ -178,19 +212,7 @@ export default function AboutPage({ data }) {
     }
   }
 }`}</code></pre>
-        <p>Restart Claude Desktop. You should see "dprk-reports" listed as a connected MCP server with 5 available tools.</p>
-
-        <h4>Setup with Claude Code (CLI)</h4>
-        <p>Create a <code>.mcp.json</code> file in your project directory:</p>
-        <pre><code>{`{
-  "mcpServers": {
-    "dprk-reports": {
-      "command": "node",
-      "args": ["/path/to/dprk-reports-new/mcp-server.js"]
-    }
-  }
-}`}</code></pre>
-        <p>Or add it globally in <code>~/.claude/settings.json</code> under the <code>mcpServers</code> key.</p>
+        <p>Verify the stdio server starts with <code>npm run mcp</code> (it communicates over stdin/stdout via JSON-RPC).</p>
 
         <h4>Available Tools</h4>
         <ul>
@@ -211,10 +233,19 @@ export default function AboutPage({ data }) {
           <li>"Find all persons connected to arms-related events in Syria"</li>
         </ul>
 
-        <h4>Verifying the Server</h4>
-        <p>To test that the MCP server is working, run:</p>
-        <pre><code>npm run mcp</code></pre>
-        <p>The server communicates via stdin/stdout using the JSON-RPC protocol. If it starts without errors, it is ready for use.</p>
+      </Section>
+
+      <Section title="Machine-Readable Discovery">
+        <p>The site publishes standard files so AI agents and crawlers can discover its capabilities automatically:</p>
+        <ul>
+          <li><code>{CANONICAL}/llms.txt</code> — a concise, LLM-friendly description of the dataset and its endpoints.</li>
+          <li><code>{CANONICAL}/.well-known/openapi.json</code> — the OpenAPI 3.1 specification for the REST API.</li>
+          <li><code>{CANONICAL}/robots.txt</code> — explicitly welcomes AI/agent crawlers (GPTBot, ClaudeBot, PerplexityBot, and others).</li>
+        </ul>
+        <p>
+          The page also embeds <a href="https://schema.org/Dataset" target="_blank" rel="noopener noreferrer">schema.org Dataset</a> structured
+          data (JSON-LD), and all API and MCP responses are CORS-enabled for browser-based agents.
+        </p>
       </Section>
 
       <Section title="Download Dataset">
