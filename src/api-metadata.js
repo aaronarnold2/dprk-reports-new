@@ -118,14 +118,22 @@ Source: UN Panel of Experts reports (2010–2023) and associated UN sanctions re
 `
 }
 
-// robots.txt that explicitly welcomes general and AI/agent crawlers.
+// robots.txt that welcomes general and AI/agent crawlers, but disallows the
+// 21 MB bulk dataset (/data.json) to limit egress. The rule is repeated in every
+// user-agent group because crawlers obey only their most-specific matching group
+// — a Disallow under "*" alone would not apply to bots that have their own group.
+// This does not affect the app (the browser's fetch ignores robots.txt) or the
+// in-app human download; agents should use the API or MCP for data instead.
 export function buildRobotsTxt(baseUrl) {
   const aiBots = ['GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'ClaudeBot', 'Claude-User', 'anthropic-ai', 'PerplexityBot', 'Google-Extended', 'CCBot', 'Applebot-Extended', 'cohere-ai']
-  return `# DPRK Reports — AI crawlers and agents welcome
-User-agent: *
-Allow: /
+  const groups = ['*', ...aiBots]
+    .map((ua) => `User-agent: ${ua}\nAllow: /\nDisallow: /data.json`)
+    .join('\n\n')
+  return `# DPRK Reports — AI crawlers and agents welcome, except the bulk data file
+${groups}
 
-${aiBots.map((b) => `User-agent: ${b}\nAllow: /`).join('\n\n')}
+# /data.json is the full 21 MB dataset; it is excluded from crawling to limit
+# egress. Use the REST API (${baseUrl}/api) or MCP (${baseUrl}/mcp) instead.
 
 # Machine-readable site description for LLMs
 # ${baseUrl}/llms.txt
