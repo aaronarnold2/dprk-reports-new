@@ -131,8 +131,17 @@ app.get('/api/paths', (req, res) => {
   res.json({ found: true, ...result })
 })
 
-// Static files and SPA fallback
-app.use(express.static(join(__dirname, 'dist'), { maxAge: '1h' }))
+// Static files and SPA fallback. The 21 MB data.json changes only on redeploy,
+// so give it a longer cache to cut repeat egress (browsers and any CDN in front
+// will serve from cache; ETag still allows revalidation after expiry).
+app.use(express.static(join(__dirname, 'dist'), {
+  maxAge: '1h',
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('data.json')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400')
+    }
+  },
+}))
 app.get('/{*path}', (req, res) => res.sendFile(join(__dirname, 'dist', 'index.html')))
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
