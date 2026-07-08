@@ -18,6 +18,21 @@ const PORT = process.env.PORT || 8080
 // X-Forwarded-For to dodge the rate limit.
 app.set('trust proxy', 1)
 
+// Origin lock — when ORIGIN_SHARED_SECRET is set, only accept requests carrying
+// the matching header (injected by Cloudflare via a Transform Rule). This blocks
+// bots that hit the Cloud Run origin URL directly, bypassing Cloudflare's WAF.
+// Fail-open when unset so the app runs before the secret is configured: add the
+// Cloudflare Transform Rule FIRST, then set the env var, to avoid locking out
+// real users. (Cloud Run's default startup probe is a TCP check, so a 403 here
+// does not affect health checks.)
+const ORIGIN_SHARED_SECRET = process.env.ORIGIN_SHARED_SECRET
+if (ORIGIN_SHARED_SECRET) {
+  app.use((req, res, next) => {
+    if (req.get('x-origin-secret') === ORIGIN_SHARED_SECRET) return next()
+    res.status(403).type('text/plain').send('Forbidden')
+  })
+}
+
 app.use(compression())
 app.use(express.json({ limit: '4mb' }))
 
@@ -131,9 +146,14 @@ app.get('/api/paths', (req, res) => {
   res.json({ found: true, ...result })
 })
 
-// Static files and SPA fallback. The 21 MB data.json changes only on redeploy,
-// so give it a longer cache to cut repeat egress (browsers and any CDN in front
-// will serve from cache; ETag still allows revalidation after expiry).
+// Unknown /api/* routes return a JSON 404 rather than falling through to the SPA
+// shell — bots probing for other software's API paths (e.g. Aleph's /api/2/*)
+// get a correct, cheap 404 instead of a 200 + HTML that looks valid.
+app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }))
+
+// Static files. The 21 MB data.json changes only on redeploy, so give it a
+// longer cache to cut repeat egress (browsers and any CDN in front will serve
+// from cache; ETag still allows revalidation after expiry).
 app.use(express.static(join(__dirname, 'dist'), {
   maxAge: '1h',
   setHeaders: (res, filePath) => {
@@ -142,6 +162,11 @@ app.use(express.static(join(__dirname, 'dist'), {
     }
   },
 }))
-app.get('/{*path}', (req, res) => res.sendFile(join(__dirname, 'dist', 'index.html')))
+
+// The app is hash-routed (#view=…), so "/" is the only HTML entry point and is
+// served by express.static above. Any other unmatched path is not a real route,
+// so return a small 404 instead of the SPA shell — this stops bots probing
+// nonexistent paths (e.g. /datasets/68) from receiving a 200 + HTML.
+app.use((req, res) => res.status(404).type('text/plain').send('Not found'))
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
