@@ -49,7 +49,14 @@ export default function MapView({ data, onSelect }) {
   useEffect(() => {
     if (mapInstanceRef.current || !mapRef.current) return
 
+    let cancelled = false
     import('leaflet').then(L => {
+      // Guard against React StrictMode's double-invoke (and against an unmount
+      // during the async import): only the surviving invocation may initialize
+      // the container, otherwise Leaflet throws "Map container is already
+      // initialized" because the ref guard above is set only after this resolves.
+      if (cancelled || mapInstanceRef.current || !mapRef.current) return
+
       const map = L.map(mapRef.current, {
         center: [20, 80],
         zoom: 3,
@@ -58,8 +65,14 @@ export default function MapView({ data, onSelect }) {
         zoomControl: true,
       })
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
+      // Esri World Dark Gray Canvas — keyless dark basemap (base + labels),
+      // replacing CARTO which now requires an API key. Esri uses {z}/{y}/{x}.
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+        maxZoom: 16,
+      }).addTo(map)
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 16,
       }).addTo(map)
 
       Object.entries(countryData).forEach(([code, info]) => {
@@ -100,6 +113,7 @@ export default function MapView({ data, onSelect }) {
     })
 
     return () => {
+      cancelled = true
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
         mapInstanceRef.current = null
