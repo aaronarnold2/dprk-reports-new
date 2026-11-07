@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
-import { loadData, searchEntities, getEntity, getConnections, findPath, getStats } from './src/utils/dataLoader.js'
+import { loadData, searchEntities, getEntity, getConnections, findPath, getStats, getGraphSeed, getSubgraph } from './src/utils/dataLoader.js'
 import { createMcpServer } from './src/mcp-tools.js'
 import { getBaseUrl, buildOpenApiSpec, buildLlmsTxt, buildRobotsTxt } from './src/api-metadata.js'
 
@@ -173,6 +173,19 @@ app.get('/api/paths', (req, res) => {
   const result = findPath(data, from, to)
   if (!result) return res.json({ found: false, message: 'No path found between these entities' })
   res.json({ found: true, ...result })
+})
+
+// Graph data for the browser app (and any client): a seed subgraph of the most
+// connected entities, and the subgraph induced by an arbitrary set of ids. These
+// let the UI render and expand the network without downloading the edge list.
+app.get('/api/graph/seed', (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 150, 400)
+  res.json(getGraphSeed(loadData(), limit))
+})
+
+app.post('/api/graph/subgraph', (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.slice(0, 2000) : []
+  res.json(getSubgraph(loadData(), ids))
 })
 
 // Unknown /api/* routes return a JSON 404 rather than falling through to the SPA

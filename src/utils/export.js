@@ -23,7 +23,7 @@ export function exportJSON(entities, filename = 'export.json') {
   download(JSON.stringify(entities, null, 2), filename, 'application/json')
 }
 
-export function exportReport(entity, connections, entityMap) {
+export function exportReport(entity, connections) {
   const name = _getName(entity)
   const lines = [
     `INVESTIGATION REPORT`,
@@ -47,7 +47,7 @@ export function exportReport(entity, connections, entityMap) {
   lines.push('', `--- CONNECTIONS (${connections.length}) ---`, '')
 
   connections.forEach(c => {
-    const other = entityMap[c.otherId]
+    const other = c.entity
     if (other) {
       const otherName = _getName(other)
       lines.push(`[${other.schema}] ${otherName}`)

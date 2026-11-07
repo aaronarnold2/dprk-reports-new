@@ -4,6 +4,11 @@ import { getEntityName, safeUrl } from '../utils/entity'
 import { clickable } from '../utils/a11y'
 import SanctionBadge from './SanctionBadge'
 
+// Graph data is served by the API (/api/graph/seed and /api/graph/subgraph) so the
+// browser never downloads the full edge list. The view holds the set of active
+// node ids; whenever it changes we fetch the induced subgraph (nodes + the edges
+// among them). Selecting a node fetches its full record and connections on demand.
+
 const SCHEMA_COLORS = {
   Person: '#49c9f0',
   Company: '#e3b341',
@@ -33,43 +38,79 @@ const FIELD_LABELS = {
   role: 'Role', relationship: 'Relationship',
 }
 
-function getDefaultIds(data) {
-  const connCount = {}
-  data.edges.forEach(e => {
-    connCount[e.source] = (connCount[e.source] || 0) + 1
-    connCount[e.target] = (connCount[e.target] || 0) + 1
-  })
-  const topConnected = data.entities
-    .filter(e => ['Person', 'Company', 'Organization', 'Vessel'].includes(e.schema) && connCount[e.id])
-    .sort((a, b) => (connCount[b.id] || 0) - (connCount[a.id] || 0))
-    .slice(0, 30)
-  const seedIds = new Set(topConnected.map(e => e.id))
-  data.edges.forEach(e => {
-    if (seedIds.has(e.source)) seedIds.add(e.target)
-    if (seedIds.has(e.target)) seedIds.add(e.source)
-  })
-  return [...seedIds].slice(0, 150)
-}
-
 const DEFAULT_HEIGHT = 600
 
-export default function GraphView({ data, entityIds: initialEntityIds, onSelect }) {
+export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
   const canvasRef = useRef()
   const containerRef = useRef()
   const simRef = useRef(null)
   const sizeRef = useRef({ width: 900, height: DEFAULT_HEIGHT })
+  const [graph, setGraph] = useState({ nodes: [], edges: [] })
+  const [activeIds, setActiveIds] = useState(() => new Set())
+  const [loading, setLoading] = useState(true)
   const [selectedNode, setSelectedNode] = useState(null)
+  const [selectedEntity, setSelectedEntity] = useState(null)
+  const [selectedConns, setSelectedConns] = useState(null)
   const [hoveredNode, setHoveredNode] = useState(null)
-  const [activeIds, setActiveIds] = useState(() => new Set(initialEntityIds || getDefaultIds(data)))
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 })
   const nodesRef = useRef([])
   const linksRef = useRef([])
   const dragRef = useRef(null)
   const panRef = useRef(null)
-  const rafRef = useRef(null)
 
   const [canvasSize, setCanvasSize] = useState({ width: 900, height: DEFAULT_HEIGHT })
   const [hiddenSchemas, setHiddenSchemas] = useState(new Set())
+
+  const applyGraph = useCallback((g) => {
+    setGraph({ nodes: g.nodes || [], edges: g.edges || [] })
+    setActiveIds(new Set((g.nodes || []).map(n => n.id)))
+  }, [])
+
+  const loadSubgraph = useCallback((ids) => {
+    setLoading(true)
+    return fetch('/api/graph/subgraph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [...ids] }),
+    })
+      .then(r => r.json())
+      .then(applyGraph)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [applyGraph])
+
+  // Initial load: an explicit id set (from search/detail/path/bookmarks) or the
+  // server's default seed subgraph.
+  useEffect(() => {
+    let cancelled = false
+    setSelectedNode(null)
+    setLoading(true)
+    const req = (initialEntityIds && initialEntityIds.length)
+      ? fetch('/api/graph/subgraph', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: initialEntityIds }) })
+      : fetch('/api/graph/seed')
+    req.then(r => r.json())
+      .then(g => { if (!cancelled) applyGraph(g) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [initialEntityIds, applyGraph])
+
+  // Selected node: fetch its full record + connections for the side panel.
+  useEffect(() => {
+    if (!selectedNode) { setSelectedEntity(null); setSelectedConns(null); return }
+    let cancelled = false
+    setSelectedEntity(null)
+    setSelectedConns(null)
+    Promise.all([
+      fetch(`/api/entity/${encodeURIComponent(selectedNode)}`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/entity/${encodeURIComponent(selectedNode)}/connections`).then(r => r.ok ? r.json() : []),
+    ]).then(([e, c]) => {
+      if (cancelled) return
+      setSelectedEntity(e)
+      setSelectedConns(Array.isArray(c) ? c : [])
+    }).catch(() => { if (!cancelled) setSelectedConns([]) })
+    return () => { cancelled = true }
+  }, [selectedNode])
 
   const toggleSchema = useCallback((schema) => {
     setHiddenSchemas(prev => {
@@ -94,67 +135,31 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     return () => observer.disconnect()
   }, [])
 
-  useEffect(() => {
-    if (initialEntityIds) {
-      setActiveIds(new Set(initialEntityIds))
-      setSelectedNode(null)
-    }
-  }, [initialEntityIds])
-
-  const neighborMap = useMemo(() => {
-    const map = {}
-    data.edges.forEach(e => {
-      if (!map[e.source]) map[e.source] = []
-      if (!map[e.target]) map[e.target] = []
-      map[e.source].push(e.target)
-      map[e.target].push(e.source)
-    })
-    return map
-  }, [data])
-
-  const expandNode = useCallback((nodeId) => {
-    const neighbors = neighborMap[nodeId] || []
-    if (neighbors.length === 0) return
-    setActiveIds(prev => {
-      const next = new Set(prev)
-      neighbors.forEach(id => next.add(id))
-      return next
-    })
-  }, [neighborMap])
-
   const expandableCount = useMemo(() => {
-    if (!selectedNode) return 0
-    return (neighborMap[selectedNode] || []).filter(id => !activeIds.has(id)).length
-  }, [selectedNode, neighborMap, activeIds])
+    if (!selectedConns) return 0
+    return selectedConns.filter(c => !activeIds.has(c.entity.id)).length
+  }, [selectedConns, activeIds])
 
-  const selectedConnections = useMemo(() => {
-    if (!selectedNode) return []
-    return data.edges
-      .filter(e => e.source === selectedNode || e.target === selectedNode)
-      .map(e => {
-        const otherId = e.source === selectedNode ? e.target : e.source
-        const other = data.entityMap[otherId]
-        if (!other) return null
-        return { ...e, other, otherId, inGraph: activeIds.has(otherId) }
-      })
-      .filter(Boolean)
-  }, [selectedNode, data, activeIds])
+  const expandNode = useCallback(() => {
+    if (!selectedConns || !selectedConns.length) return
+    const next = new Set(activeIds)
+    selectedConns.forEach(c => next.add(c.entity.id))
+    loadSubgraph(next)
+  }, [selectedConns, activeIds, loadSubgraph])
 
-  // Build and run simulation when activeIds change
+  // Build and run the simulation whenever the fetched graph changes.
   useEffect(() => {
     if (simRef.current) simRef.current.stop()
 
-    const idArray = [...activeIds]
-    const nodes = idArray.map(id => data.entityMap[id]).filter(Boolean).map(e => ({
-      id: e.id,
-      name: getEntityName(e),
-      schema: e.schema,
-      color: SCHEMA_COLORS[e.schema] || '#5f7a64',
-      sanctioned: data.sanctionedIds?.has(e.id) || false,
+    const nodes = graph.nodes.map(n => ({
+      id: n.id,
+      name: n.name,
+      schema: n.schema,
+      color: SCHEMA_COLORS[n.schema] || '#5f7a64',
+      sanctioned: n.sanctioned,
     }))
-
     const nodeSet = new Set(nodes.map(n => n.id))
-    const links = data.edges
+    const links = graph.edges
       .filter(e => nodeSet.has(e.source) && nodeSet.has(e.target))
       .map(e => ({ source: e.source, target: e.target }))
 
@@ -172,9 +177,8 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     setTransform({ x: 0, y: 0, k: 1 })
 
     return () => { sim.stop() }
-  }, [activeIds, data])
+  }, [graph])
 
-  // Redraw when selection/hover/visibility changes without restarting sim
   useEffect(() => { draw() }, [selectedNode, hoveredNode, transform, canvasSize, hiddenSchemas])
 
   function draw() {
@@ -245,7 +249,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
         ctx.font = `${fontSize}px ui-monospace, Menlo, Consolas, monospace`
         ctx.fillStyle = isSelected || isHovered ? '#eafff0' : 'rgba(185,235,196,0.7)'
         ctx.textAlign = 'center'
-        const label = n.name.length > 25 ? n.name.slice(0, 25) + '...' : n.name
+        const label = n.name && n.name.length > 25 ? n.name.slice(0, 25) + '...' : (n.name || '')
         ctx.fillText(label, n.x, n.y + r + fontSize + 2 / transform.k)
       }
     })
@@ -333,13 +337,13 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     })
   }, [])
 
-  const selectedEntity = selectedNode && data.entityMap[selectedNode]
+  const selectedNodeObj = graph.nodes.find(n => n.id === selectedNode)
 
   return (
     <div>
       <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>
-          {nodesRef.current.length} nodes · {linksRef.current.length} edges
+          {loading ? 'Loading graph…' : `${nodesRef.current.length} nodes · ${linksRef.current.length} edges`}
         </span>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {Object.entries(SCHEMA_COLORS).filter(([s]) => nodesRef.current.some(n => n.schema === s)).map(([schema, color]) => {
@@ -366,16 +370,16 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
             onWheel={handleWheel}
           />
         </div>
-        {selectedEntity && (
+        {selectedNodeObj && (
           <div style={{ width: 340, flexShrink: 0, background: 'var(--surface)', borderRadius: 8, padding: 16, height: DEFAULT_HEIGHT, overflowY: 'auto' }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-              <span className={`badge badge-${selectedEntity.schema.toLowerCase()}`}>{selectedEntity.schema}</span>
-              <strong style={{ fontSize: 15 }}>{getEntityName(selectedEntity)}</strong>
-              {data.sanctionedIds?.has(selectedNode) && <SanctionBadge size="small" />}
+              <span className={`badge badge-${selectedNodeObj.schema.toLowerCase()}`}>{selectedNodeObj.schema}</span>
+              <strong style={{ fontSize: 15 }}>{selectedNodeObj.name}</strong>
+              {selectedNodeObj.sanctioned && <SanctionBadge size="small" />}
             </div>
 
             <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-              <button onClick={() => expandNode(selectedNode)} style={{ fontSize: 12, padding: '4px 10px' }}>
+              <button onClick={expandNode} disabled={!selectedConns} style={{ fontSize: 12, padding: '4px 10px' }}>
                 Expand{expandableCount > 0 ? ` (+${expandableCount})` : ''}
               </button>
               <button className="secondary" onClick={() => onSelect(selectedNode)} style={{ fontSize: 12, padding: '4px 10px' }}>
@@ -386,50 +390,52 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
               </button>
             </div>
 
-            <div style={{ marginBottom: 16 }}>
-              <h4 style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 8 }}>Properties</h4>
-              {Object.entries(selectedEntity.properties)
-                .filter(([k]) => !HIDDEN_PROPS.has(k))
-                .map(([key, values]) => (
-                <div key={key} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{FIELD_LABELS[key] || key}</div>
-                  <div style={{ fontSize: 13 }}>
-                    {(key === 'sourceUrl' || key === 'website') && safeUrl(values[0]) ? (
-                      <a href={safeUrl(values[0])} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{values[0]}</a>
-                    ) : key === 'country' || key === 'nationality' || key === 'flag' ? (
-                      values.map(v => v.toUpperCase()).join(', ')
-                    ) : key === 'description' ? (
-                      <span style={{ fontSize: 12, lineHeight: 1.5 }}>{values[0].length > 300 ? values[0].slice(0, 300) + '...' : values[0]}</span>
-                    ) : (
-                      values.join(', ')
-                    )}
+            {selectedEntity && (
+              <div style={{ marginBottom: 16 }}>
+                <h4 style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 8 }}>Properties</h4>
+                {Object.entries(selectedEntity.properties)
+                  .filter(([k]) => !HIDDEN_PROPS.has(k))
+                  .map(([key, values]) => (
+                  <div key={key} style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{FIELD_LABELS[key] || key}</div>
+                    <div style={{ fontSize: 13 }}>
+                      {(key === 'sourceUrl' || key === 'website') && safeUrl(values[0]) ? (
+                        <a href={safeUrl(values[0])} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{values[0]}</a>
+                      ) : key === 'country' || key === 'nationality' || key === 'flag' ? (
+                        values.map(v => v.toUpperCase()).join(', ')
+                      ) : key === 'description' ? (
+                        <span style={{ fontSize: 12, lineHeight: 1.5 }}>{values[0].length > 300 ? values[0].slice(0, 300) + '...' : values[0]}</span>
+                      ) : (
+                        values.join(', ')
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             <div>
               <h4 style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 8 }}>
-                Connections ({selectedConnections.length})
+                Connections ({selectedConns ? selectedConns.length : '…'})
               </h4>
-              {selectedConnections.slice(0, 20).map((c, i) => (
+              {(selectedConns || []).slice(0, 20).map((c, i) => (
                 <div key={i} {...clickable(() => {
-                  if (c.inGraph) setSelectedNode(c.otherId)
-                  else onSelect(c.otherId)
-                }, `View ${getEntityName(c.other)}`)} style={{ padding: '6px 8px', background: 'var(--surface2)', borderRadius: 4, cursor: 'pointer', marginBottom: 4, borderLeft: c.inGraph ? '3px solid var(--accent)' : '3px solid var(--border)' }}>
+                  if (activeIds.has(c.entity.id)) setSelectedNode(c.entity.id)
+                  else onSelect(c.entity.id)
+                }, `View ${getEntityName(c.entity)}`)} style={{ padding: '6px 8px', background: 'var(--surface2)', borderRadius: 4, cursor: 'pointer', marginBottom: 4, borderLeft: activeIds.has(c.entity.id) ? '3px solid var(--accent)' : '3px solid var(--border)' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span className={`badge badge-${c.other.schema.toLowerCase()}`} style={{ fontSize: 9 }}>{c.other.schema}</span>
-                    <span style={{ fontWeight: 500, fontSize: 12 }}>{getEntityName(c.other)}</span>
+                    <span className={`badge badge-${c.entity.schema.toLowerCase()}`} style={{ fontSize: 9 }}>{c.entity.schema}</span>
+                    <span style={{ fontWeight: 500, fontSize: 12 }}>{getEntityName(c.entity)}</span>
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
                     {c.schema}{c.role ? `: ${c.role}` : ''}{c.relationship ? ` (${c.relationship})` : ''}
                   </div>
                 </div>
               ))}
-              {selectedConnections.length > 20 && (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: 4 }}>+{selectedConnections.length - 20} more</div>
+              {selectedConns && selectedConns.length > 20 && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: 4 }}>+{selectedConns.length - 20} more</div>
               )}
-              {selectedConnections.length === 0 && (
+              {selectedConns && selectedConns.length === 0 && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No connections</div>
               )}
             </div>
