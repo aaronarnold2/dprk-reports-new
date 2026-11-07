@@ -67,6 +67,11 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
   const [canvasSize, setCanvasSize] = useState({ width: 900, height: DEFAULT_HEIGHT })
   const [hiddenSchemas, setHiddenSchemas] = useState(new Set())
 
+  // "Add node" search box: type a name, pick a result, drop it onto the graph.
+  const [addQuery, setAddQuery] = useState('')
+  const [addResults, setAddResults] = useState([])
+  const [addOpen, setAddOpen] = useState(false)
+
   const applyGraph = useCallback((g) => {
     setGraph({ nodes: g.nodes || [], edges: g.edges || [] })
     setActiveIds(new Set((g.nodes || []).map(n => n.id)))
@@ -85,16 +90,19 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
       .finally(() => setLoading(false))
   }, [applyGraph])
 
-  // Initial load: an explicit id set (from search/detail/path/bookmarks) or the
-  // server's default seed subgraph.
+  // Initial load: an explicit id set (from search/detail/path/bookmarks). With no
+  // ids the graph opens blank — the user builds it up by adding nodes.
   useEffect(() => {
     let cancelled = false
     setSelectedNode(null)
+    if (!initialEntityIds || !initialEntityIds.length) {
+      applyGraph({ nodes: [], edges: [] })
+      setLoading(false)
+      return () => { cancelled = true }
+    }
     setLoading(true)
-    const req = (initialEntityIds && initialEntityIds.length)
-      ? fetch('/api/graph/subgraph', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: initialEntityIds }) })
-      : fetch('/api/graph/seed')
-    req.then(r => r.json())
+    fetch('/api/graph/subgraph', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: initialEntityIds }) })
+      .then(r => r.json())
       .then(g => { if (!cancelled) applyGraph(g) })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -153,6 +161,30 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
     loadSubgraph(next)
   }, [selectedConns, activeIds, loadSubgraph])
 
+  // Debounced entity lookup for the add-node box.
+  useEffect(() => {
+    const q = addQuery.trim()
+    if (q.length < 2) { setAddResults([]); return }
+    let cancelled = false
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(q)}&limit=8`)
+        .then(r => r.json())
+        .then(d => { if (!cancelled) setAddResults(d.results || []) })
+        .catch(() => { if (!cancelled) setAddResults([]) })
+    }, 200)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [addQuery])
+
+  const addNode = useCallback((id) => {
+    const next = new Set(activeIds)
+    next.add(id)
+    loadSubgraph(next)
+    setAddQuery('')
+    setAddResults([])
+    setAddOpen(false)
+    setSelectedNode(id)
+  }, [activeIds, loadSubgraph])
+
   // Build and run the simulation whenever the fetched graph changes.
   useEffect(() => {
     if (simRef.current) simRef.current.stop()
@@ -194,7 +226,7 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
     return () => { sim.stop() }
   }, [graph])
 
-  useEffect(() => { draw() }, [selectedNode, hoveredNode, transform, canvasSize, hiddenSchemas])
+  useEffect(() => { draw() }, [selectedNode, hoveredNode, transform, canvasSize, hiddenSchemas, loading, graph])
 
   function draw() {
     const canvas = canvasRef.current
@@ -270,6 +302,15 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
     })
 
     ctx.restore()
+
+    // Empty graph: prompt the user to add a node.
+    if (nodesRef.current.length === 0 && !loading) {
+      ctx.fillStyle = 'rgba(185,235,196,0.5)'
+      ctx.font = '14px ui-monospace, Menlo, Consolas, monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText('Empty graph — use "Add node" above to start building a network',
+        sizeRef.current.width / 2, sizeRef.current.height / 2)
+    }
   }
 
   const screenToWorld = useCallback((sx, sy) => ({
@@ -372,6 +413,33 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
         <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>
           {loading ? 'Loading graph…' : `${nodesRef.current.length} nodes · ${linksRef.current.length} edges`}
         </span>
+        <div style={{ position: 'relative' }}>
+          <input
+            type="text"
+            aria-label="Add node to graph"
+            placeholder="＋ Add node…"
+            value={addQuery}
+            onChange={e => { setAddQuery(e.target.value); setAddOpen(true) }}
+            onFocus={() => setAddOpen(true)}
+            onBlur={() => setTimeout(() => setAddOpen(false), 150)}
+            style={{ fontSize: 12, padding: '4px 10px', width: 200 }}
+          />
+          {addOpen && addResults.length > 0 && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 20, marginTop: 4, width: 320, maxHeight: 280, overflowY: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 6px 20px rgba(0,0,0,0.4)' }}>
+              {addResults.map(r => {
+                const already = activeIds.has(r.id)
+                return (
+                  <div key={r.id} {...clickable(() => { if (!already) addNode(r.id) }, `Add ${getEntityName(r)} to graph`)} style={{ padding: '6px 10px', cursor: already ? 'default' : 'pointer', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid var(--border)', opacity: already ? 0.45 : 1 }}>
+                    <span className={`badge badge-${r.schema.toLowerCase()}`} style={{ fontSize: 9 }}>{r.schema}</span>
+                    <span style={{ fontSize: 12, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getEntityName(r)}</span>
+                    {r.sanctioned && <SanctionBadge size="small" />}
+                    {already && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>on graph</span>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
         <button className="secondary" onClick={exportPNG} disabled={loading || !nodesRef.current.length} style={{ fontSize: 12, padding: '4px 10px' }}>
           Export PNG
         </button>
