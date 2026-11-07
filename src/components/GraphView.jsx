@@ -4,15 +4,15 @@ import { getEntityName } from '../utils/entity'
 import SanctionBadge from './SanctionBadge'
 
 const SCHEMA_COLORS = {
-  Person: '#4f8ff7',
-  Company: '#d29922',
-  Organization: '#e5534b',
-  Vessel: '#3fb950',
-  Event: '#bc8cff',
-  Identification: '#8b90a0',
-  Sanction: '#e5534b',
-  Document: '#8b90a0',
-  Documentation: '#6e7681',
+  Person: '#49c9f0',
+  Company: '#e3b341',
+  Organization: '#ff5f56',
+  Vessel: '#2ee86a',
+  Event: '#c678dd',
+  Identification: '#7d9a82',
+  Sanction: '#ff5f56',
+  Document: '#7d9a82',
+  Documentation: '#5f7a64',
 }
 
 const HIDDEN_PROPS = new Set(['proof', 'involved', 'document', 'entity', 'holder', 'employer', 'employee', 'member', 'organization', 'person', 'associate', 'subject', 'object', 'authority'])
@@ -148,7 +148,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
       id: e.id,
       name: getEntityName(e),
       schema: e.schema,
-      color: SCHEMA_COLORS[e.schema] || '#666',
+      color: SCHEMA_COLORS[e.schema] || '#5f7a64',
       sanctioned: data.sanctionedIds?.has(e.id) || false,
     }))
 
@@ -187,7 +187,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
     canvas.style.height = sizeRef.current.height + 'px'
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-    ctx.fillStyle = '#1a1d27'
+    ctx.fillStyle = '#0a0f0b'
     ctx.fillRect(0, 0, sizeRef.current.width, sizeRef.current.height)
 
     ctx.save()
@@ -207,7 +207,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
       ctx.beginPath()
       ctx.moveTo(l.source.x, l.source.y)
       ctx.lineTo(l.target.x, l.target.y)
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+      ctx.strokeStyle = 'rgba(46,232,106,0.14)'
       ctx.lineWidth = 0.5 / transform.k
       ctx.stroke()
     })
@@ -221,7 +221,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
       if (n.sanctioned) {
         ctx.beginPath()
         ctx.arc(n.x, n.y, r + 3 / transform.k, 0, Math.PI * 2)
-        ctx.strokeStyle = '#e5534b'
+        ctx.strokeStyle = '#ff5f56'
         ctx.lineWidth = 2 / transform.k
         ctx.stroke()
       }
@@ -229,20 +229,20 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
       if (isSelected) {
         ctx.beginPath()
         ctx.arc(n.x, n.y, r + (n.sanctioned ? 5 : 3) / transform.k, 0, Math.PI * 2)
-        ctx.strokeStyle = '#fff'
+        ctx.strokeStyle = '#2ee86a'
         ctx.lineWidth = 2 / transform.k
         ctx.stroke()
       }
 
       ctx.beginPath()
       ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
-      ctx.fillStyle = isSelected ? '#fff' : n.color
+      ctx.fillStyle = isSelected ? '#eafff0' : n.color
       ctx.fill()
 
       if (transform.k > 0.7 || isSelected || isHovered) {
         const fontSize = Math.max(8, 10 / transform.k)
-        ctx.font = `${fontSize}px sans-serif`
-        ctx.fillStyle = isSelected || isHovered ? '#fff' : 'rgba(225,228,237,0.7)'
+        ctx.font = `${fontSize}px ui-monospace, Menlo, Consolas, monospace`
+        ctx.fillStyle = isSelected || isHovered ? '#eafff0' : 'rgba(185,235,196,0.7)'
         ctx.textAlign = 'center'
         const label = n.name.length > 25 ? n.name.slice(0, 25) + '...' : n.name
         ctx.fillText(label, n.x, n.y + r + fontSize + 2 / transform.k)

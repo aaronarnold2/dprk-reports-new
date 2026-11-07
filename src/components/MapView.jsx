@@ -81,13 +81,13 @@ export default function MapView({ data, onSelect }) {
 
         const radius = Math.max(6, Math.min(30, (info.count / maxCount) * 30))
         const intensity = Math.min(1, info.count / (maxCount * 0.3))
-        const color = `rgba(79, 143, 247, ${0.3 + intensity * 0.7})`
+        const color = `rgba(46, 232, 106, ${0.3 + intensity * 0.7})`
 
         const circle = L.circleMarker([coords[0], coords[1]], {
           radius,
           fillColor: color,
           fillOpacity: 0.8,
-          color: '#4f8ff7',
+          color: '#2ee86a',
           weight: 1,
         }).addTo(map)
 
@@ -97,10 +97,10 @@ export default function MapView({ data, onSelect }) {
           .join('<br/>')
 
         circle.bindPopup(`
-          <div style="font-family: sans-serif; min-width: 150px;">
-            <strong style="font-size: 14px;">${code.toUpperCase()}</strong>
+          <div style="font-family: ui-monospace, Menlo, Consolas, monospace; min-width: 150px; color: #b9ebc4;">
+            <strong style="font-size: 14px; color: #2ee86a; letter-spacing: 0.04em;">${code.toUpperCase()}</strong>
             <div style="margin: 4px 0; font-size: 18px; font-weight: bold;">${info.count} entities</div>
-            <div style="font-size: 12px; color: #888;">${schemaBreakdown}</div>
+            <div style="font-size: 12px; color: #5f8a68;">${schemaBreakdown}</div>
           </div>
         `)
 

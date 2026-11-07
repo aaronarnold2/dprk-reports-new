@@ -44,8 +44,8 @@ export default function TimelineView({ data, onSelect }) {
   }, [timedEntities])
 
   const SCHEMA_COLORS = {
-    Person: '#4f8ff7', Company: '#d29922', Organization: '#e5534b',
-    Vessel: '#3fb950', Event: '#bc8cff', Sanction: '#e5534b',
+    Person: '#49c9f0', Company: '#e3b341', Organization: '#ff5f56',
+    Vessel: '#2ee86a', Event: '#c678dd', Sanction: '#ff5f56',
   }
 
   return (
@@ -78,7 +78,7 @@ export default function TimelineView({ data, onSelect }) {
             <div style={{ flex: 1, display: 'grid', gap: 4 }}>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>{entities.length} {entities.length === 1 ? 'entity' : 'entities'}</div>
               {entities.slice(0, 10).map(e => (
-                <div key={e.id} onClick={() => onSelect(e.id)} style={{ padding: '6px 10px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center', borderLeft: `3px solid ${SCHEMA_COLORS[e.schema] || '#666'}` }}>
+                <div key={e.id} onClick={() => onSelect(e.id)} style={{ padding: '6px 10px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center', borderLeft: `3px solid ${SCHEMA_COLORS[e.schema] || '#5f7a64'}` }}>
                   <span className={`badge badge-${e.schema.toLowerCase()}`} style={{ fontSize: 10 }}>{e.schema}</span>
                   <span style={{ fontWeight: 500, fontSize: 13 }}>{getEntityName(e)}</span>
                   <span style={{ color: 'var(--text-dim)', fontSize: 11, marginLeft: 'auto' }}>{e._dateStr}</span>
