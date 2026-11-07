@@ -359,9 +359,12 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
     }
 
     if (panRef.current) {
-      const dx = e.clientX - panRef.current.startX
-      const dy = e.clientY - panRef.current.startY
-      setTransform(prev => ({ ...prev, x: panRef.current.tx + dx, y: panRef.current.ty + dy }))
+      // Capture pan origin locally: the setTransform updater runs asynchronously,
+      // by which point panRef.current may be null (mouseup/leave cleared it).
+      const { startX, startY, tx, ty } = panRef.current
+      const dx = e.clientX - startX
+      const dy = e.clientY - startY
+      setTransform(prev => ({ ...prev, x: tx + dx, y: ty + dy }))
       return
     }
 
