@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { findShortestPath } from '../utils/pathfinder'
 import { getEntityName } from '../utils/entity'
 import { clickable } from '../utils/a11y'
 
@@ -10,6 +9,7 @@ export default function PathFinder({ data, onSelect, onGraph }) {
   const [targetId, setTargetId] = useState(null)
   const [pathResult, setPathResult] = useState(null)
   const [noPath, setNoPath] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const searchable = useMemo(() => {
     return data.entities
@@ -50,15 +50,21 @@ export default function PathFinder({ data, onSelect, onGraph }) {
 
   const findPath = useCallback(() => {
     if (!sourceId || !targetId) return
-    const result = findShortestPath(data.edges, sourceId, targetId)
-    if (result) {
-      setPathResult(result)
-      setNoPath(false)
-    } else {
-      setPathResult(null)
-      setNoPath(true)
-    }
-  }, [sourceId, targetId, data.edges])
+    setLoading(true)
+    setPathResult(null)
+    setNoPath(false)
+    fetch(`/api/paths?from=${encodeURIComponent(sourceId)}&to=${encodeURIComponent(targetId)}`)
+      .then(r => r.json())
+      .then(result => {
+        if (result && result.found) {
+          setPathResult({ nodes: result.path, edges: result.edges || [] })
+        } else {
+          setNoPath(true)
+        }
+      })
+      .catch(() => setNoPath(true))
+      .finally(() => setLoading(false))
+  }, [sourceId, targetId])
 
   const clearSource = () => { setSourceId(null); setSourceQuery(''); setPathResult(null); setNoPath(false) }
   const clearTarget = () => { setTargetId(null); setTargetQuery(''); setPathResult(null); setNoPath(false) }
@@ -74,6 +80,7 @@ export default function PathFinder({ data, onSelect, onGraph }) {
           <div style={{ display: 'flex', gap: 4 }}>
             <input
               type="text"
+              aria-label="From entity"
               value={sourceQuery}
               onChange={e => { setSourceQuery(e.target.value); setSourceId(null) }}
               placeholder="Search entity..."
@@ -91,6 +98,7 @@ export default function PathFinder({ data, onSelect, onGraph }) {
           <div style={{ display: 'flex', gap: 4 }}>
             <input
               type="text"
+              aria-label="To entity"
               value={targetQuery}
               onChange={e => { setTargetQuery(e.target.value); setTargetId(null) }}
               placeholder="Search entity..."
@@ -104,7 +112,7 @@ export default function PathFinder({ data, onSelect, onGraph }) {
         </div>
 
         <div style={{ paddingTop: 20 }}>
-          <button onClick={findPath} disabled={!sourceId || !targetId}>Find Path</button>
+          <button onClick={findPath} disabled={!sourceId || !targetId || loading}>{loading ? 'Finding…' : 'Find Path'}</button>
         </div>
       </div>
 
@@ -118,18 +126,17 @@ export default function PathFinder({ data, onSelect, onGraph }) {
         <div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 }}>
             <span style={{ color: 'var(--success)', fontWeight: 600 }}>Path found — {pathResult.nodes.length} entities, {pathResult.nodes.length - 1} hops</span>
-            <button onClick={() => onGraph(pathResult.nodes)}>View in Graph</button>
+            <button onClick={() => onGraph(pathResult.nodes.map(n => n.id))}>View in Graph</button>
           </div>
           <div style={{ position: 'relative', paddingLeft: 24 }}>
-            {pathResult.nodes.map((nodeId, i) => {
-              const entity = data.entityMap[nodeId]
+            {pathResult.nodes.map((entity, i) => {
               if (!entity) return null
               const edge = pathResult.edges[i]
               return (
-                <div key={nodeId}>
+                <div key={entity.id}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', position: 'relative' }}>
                     <div style={{ position: 'absolute', left: -24, width: 16, height: 16, borderRadius: '50%', background: i === 0 || i === pathResult.nodes.length - 1 ? 'var(--accent)' : 'var(--surface2)', border: '2px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
-                    <div {...clickable(() => onSelect(nodeId), `View ${getEntityName(entity)}`)} style={{ flex: 1, padding: '10px 14px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <div {...clickable(() => onSelect(entity.id), `View ${getEntityName(entity)}`)} style={{ flex: 1, padding: '10px 14px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}>
                       <span className={`badge badge-${entity.schema.toLowerCase()}`}>{entity.schema}</span>
                       <span style={{ fontWeight: 600 }}>{getEntityName(entity)}</span>
                       {entity.properties.description && (

@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import Dashboard from './components/Dashboard'
 import SearchPanel from './components/SearchPanel'
 import EntityDetail from './components/EntityDetail'
-import GraphView from './components/GraphView'
-import MapView from './components/MapView'
 import BookmarkPanel from './components/BookmarkPanel'
-import PathFinder from './components/PathFinder'
 import AboutPage from './components/AboutPage'
 import { getBookmarks } from './utils/bookmarks'
+
+// Heavy views (d3-force graph, Leaflet map) load on demand so they stay out of the
+// initial bundle.
+const GraphView = lazy(() => import('./components/GraphView'))
+const MapView = lazy(() => import('./components/MapView'))
+const PathFinder = lazy(() => import('./components/PathFinder'))
 
 const VIEWS = ['dashboard', 'search', 'graph', 'map', 'paths', 'bookmarks', 'guide']
 
@@ -29,8 +32,13 @@ function buildHash(state) {
   return str ? '#' + str : ''
 }
 
+function Loading({ label = 'Loading…' }) {
+  return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{label}</div>
+}
+
 export default function App() {
-  const [data, setData] = useState(null)
+  const [data, setData] = useState(null)   // trimmed client index (search/map/paths)
+  const [stats, setStats] = useState(null)  // /api/stats (dashboard + totals)
   const [view, setViewState] = useState('dashboard')
   const [selectedEntity, setSelectedEntity] = useState(null)
   const [graphEntities, setGraphEntities] = useState(null)
@@ -38,28 +46,36 @@ export default function App() {
   const [searchState, setSearchState] = useState({ query: '', type: '', country: '' })
 
   useEffect(() => {
-    fetch('/data.json')
+    // Apply the initial hash immediately so deep links work before the index
+    // finishes loading (entity detail and graph are API-driven and don't need it).
+    const h = parseHash()
+    if (h.entity) {
+      setSelectedEntity(h.entity)
+      setViewState('detail')
+    } else if (h.view && (VIEWS.includes(h.view) || h.view === 'detail')) {
+      setViewState(h.view)
+    }
+    if (h.q || h.type || h.country) {
+      setSearchState({ query: h.q || '', type: h.type || '', country: h.country || '' })
+      if (!h.entity && !h.view) setViewState('search')
+    }
+    setBookmarks(getBookmarks())
+
+    // Stats is tiny and lands fast, so the dashboard paints without waiting on the
+    // index. The trimmed index streams in parallel for the search/map/path views.
+    fetch('/api/stats').then(r => r.json()).then(setStats).catch(() => {})
+    fetch('/app-index.json')
       .then(r => r.json())
       .then(d => {
         const entityMap = {}
-        d.entities.forEach(e => { entityMap[e.id] = e })
         const sanctionedIds = new Set()
-        d.edges.forEach(e => { if (e.schema === 'Sanction') sanctionedIds.add(e.source) })
-        setData({ entities: d.entities, edges: d.edges, entityMap, sanctionedIds })
-
-        const h = parseHash()
-        if (h.entity && entityMap[h.entity]) {
-          setSelectedEntity(h.entity)
-          setViewState('detail')
-        } else if (h.view && (VIEWS.includes(h.view) || h.view === 'detail')) {
-          setViewState(h.view)
-        }
-        if (h.q || h.type || h.country) {
-          setSearchState({ query: h.q || '', type: h.type || '', country: h.country || '' })
-          if (!h.entity) setViewState('search')
-        }
+        d.entities.forEach(e => {
+          entityMap[e.id] = e
+          if (e.sanctioned) sanctionedIds.add(e.id)
+        })
+        setData({ entities: d.entities, entityMap, sanctionedIds })
       })
-    setBookmarks(getBookmarks())
+      .catch(() => {})
   }, [])
 
   const setView = useCallback((v) => {
@@ -89,7 +105,7 @@ export default function App() {
   useEffect(() => {
     const onPopState = () => {
       const h = parseHash()
-      if (h.entity && data?.entityMap[h.entity]) {
+      if (h.entity) {
         setSelectedEntity(h.entity)
         setViewState('detail')
       } else if (h.view) {
@@ -100,9 +116,9 @@ export default function App() {
     }
     window.addEventListener('hashchange', onPopState)
     return () => window.removeEventListener('hashchange', onPopState)
-  }, [data])
+  }, [])
 
-  if (!data) return <div style={{ padding: 40, textAlign: 'center' }}>Loading dataset...</div>
+  if (!stats) return <Loading />
 
   return (
     <div style={{ minHeight: '100vh' }}>
@@ -125,14 +141,16 @@ export default function App() {
         )}
       </header>
       <main style={{ padding: 24 }}>
-        {view === 'dashboard' && <Dashboard data={data} onSelect={openEntity} onGraph={openGraph} />}
-        {view === 'search' && <SearchPanel data={data} onSelect={openEntity} onGraph={openGraph} searchState={searchState} onSearchStateChange={updateSearchState} />}
-        {view === 'detail' && selectedEntity && <EntityDetail data={data} entityId={selectedEntity} onSelect={openEntity} onGraph={openGraph} bookmarks={bookmarks} setBookmarks={setBookmarks} />}
-        {view === 'graph' && <GraphView data={data} entityIds={graphEntities} onSelect={openEntity} />}
-        {view === 'map' && <MapView data={data} onSelect={openEntity} />}
-        {view === 'paths' && <PathFinder data={data} onSelect={openEntity} onGraph={openGraph} />}
-        {view === 'bookmarks' && <BookmarkPanel bookmarks={bookmarks} setBookmarks={setBookmarks} onSelect={openEntity} onGraph={openGraph} />}
-        {view === 'guide' && <AboutPage data={data} />}
+        <Suspense fallback={<Loading label="Loading view…" />}>
+          {view === 'dashboard' && <Dashboard stats={stats} />}
+          {view === 'search' && (data ? <SearchPanel data={data} onSelect={openEntity} onGraph={openGraph} searchState={searchState} onSearchStateChange={updateSearchState} /> : <Loading label="Loading dataset…" />)}
+          {view === 'detail' && selectedEntity && <EntityDetail entityId={selectedEntity} onSelect={openEntity} onGraph={openGraph} bookmarks={bookmarks} setBookmarks={setBookmarks} />}
+          {view === 'graph' && <GraphView entityIds={graphEntities} onSelect={openEntity} />}
+          {view === 'map' && (data ? <MapView data={data} onSelect={openEntity} /> : <Loading label="Loading dataset…" />)}
+          {view === 'paths' && (data ? <PathFinder data={data} onSelect={openEntity} onGraph={openGraph} /> : <Loading label="Loading dataset…" />)}
+          {view === 'bookmarks' && <BookmarkPanel bookmarks={bookmarks} setBookmarks={setBookmarks} onSelect={openEntity} onGraph={openGraph} />}
+          {view === 'guide' && <AboutPage stats={stats} />}
+        </Suspense>
       </main>
     </div>
   )

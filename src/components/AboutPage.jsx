@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function AboutPage({ data }) {
+export default function AboutPage({ stats }) {
   // Canonical public address — used in copy/paste API, MCP, and discovery URLs
   // so they are correct regardless of where the guide is being viewed.
   const CANONICAL = 'https://dprk-reports.org'
@@ -23,7 +23,7 @@ export default function AboutPage({ data }) {
         </p>
         <p>
           The dataset uses the <a href="https://followthemoney.tech/explorer/schemata/" target="_blank" rel="noopener noreferrer">Follow the Money (FTM)</a> data
-          schema — a standard designed for financial crime, corruption investigations, and document forensics. It contains <strong>{data.entities.length.toLocaleString()} entities</strong> and <strong>{data.edges.length.toLocaleString()} relationships</strong> spanning
+          schema — a standard designed for financial crime, corruption investigations, and document forensics. It contains <strong>{stats.totalEntities.toLocaleString()} entities</strong> and <strong>{stats.totalEdges.toLocaleString()} relationships</strong> spanning
           individuals, companies, organizations, vessels, events, sanctions, and source documents linked to DPRK sanctions evasion activities.
         </p>
         <h4>Entity types</h4>
@@ -250,8 +250,8 @@ export default function AboutPage({ data }) {
 
       <Section title="Download Dataset">
         <p>
-          Download the complete processed dataset in JSON format. The file contains all {data.entities.length.toLocaleString()} entities
-          and {data.edges.length.toLocaleString()} relationships in the Follow the Money schema.
+          Download the complete processed dataset in JSON format. The file contains all {stats.totalEntities.toLocaleString()} entities
+          and {stats.totalEdges.toLocaleString()} relationships in the Follow the Money schema.
         </p>
         <button onClick={handleDownload} style={{ marginTop: 8 }}>
           Download Complete Dataset (JSON)

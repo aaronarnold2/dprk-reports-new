@@ -80,6 +80,27 @@ export function buildOpenApiSpec(baseUrl) {
           },
         },
       },
+      '/api/graph/seed': {
+        get: {
+          operationId: 'getGraphSeed',
+          summary: 'Seed subgraph of the most connected entities',
+          description: 'Returns nodes and the edges among them for the most connected entities plus their neighbors — the graph view\'s default.',
+          parameters: [{ name: 'limit', in: 'query', description: 'Max nodes (default 150, max 400)', schema: { type: 'integer', default: 150, maximum: 400 } }],
+          responses: { 200: { description: 'Subgraph { nodes, edges }', content: { 'application/json': { schema: { type: 'object' } } } } },
+        },
+      },
+      '/api/graph/subgraph': {
+        post: {
+          operationId: 'getSubgraph',
+          summary: 'Induced subgraph for a set of entity ids',
+          description: 'Given entity ids, returns those nodes and every edge whose both endpoints are in the set.',
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { type: 'object', properties: { ids: { type: 'array', items: { type: 'string' } } }, required: ['ids'] } } },
+          },
+          responses: { 200: { description: 'Subgraph { nodes, edges }', content: { 'application/json': { schema: { type: 'object' } } } } },
+        },
+      },
     },
   }
 }
@@ -103,6 +124,8 @@ export function buildLlmsTxt(baseUrl) {
 - GET ${baseUrl}/api/entity/{id} — full entity details
 - GET ${baseUrl}/api/entity/{id}/connections — an entity's relationships
 - GET ${baseUrl}/api/paths?from=&to= — shortest path between two entities
+- GET ${baseUrl}/api/graph/seed?limit= — seed subgraph of the most connected entities
+- POST ${baseUrl}/api/graph/subgraph — induced subgraph for a set of entity ids (JSON body: {"ids":[...]})
 
 ## MCP tools
 

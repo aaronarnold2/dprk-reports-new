@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { addBookmark, removeBookmark, isBookmarked } from '../utils/bookmarks'
 import { exportReport } from '../utils/export'
 import { getEntityName, safeUrl } from '../utils/entity'
@@ -25,36 +25,51 @@ const FIELD_LABELS = {
   document: 'Document', entity: 'Entity',
 }
 
-export default function EntityDetail({ data, entityId, onSelect, onGraph, bookmarks, setBookmarks }) {
-  const entity = data.entityMap[entityId]
-  if (!entity) return <div>Entity not found</div>
+export default function EntityDetail({ entityId, onSelect, onGraph, bookmarks, setBookmarks }) {
+  const [entity, setEntity] = useState(null)
+  const [connections, setConnections] = useState([])
+  const [status, setStatus] = useState('loading') // loading | ready | notfound | error
 
-  const connections = useMemo(() => {
-    return data.edges
-      .filter(e => e.source === entityId || e.target === entityId)
-      .map(e => {
-        const otherId = e.source === entityId ? e.target : e.source
-        const other = data.entityMap[otherId]
-        return { ...e, other, otherId }
+  useEffect(() => {
+    let cancelled = false
+    setStatus('loading')
+    setEntity(null)
+    setConnections([])
+    Promise.all([
+      fetch(`/api/entity/${encodeURIComponent(entityId)}`),
+      fetch(`/api/entity/${encodeURIComponent(entityId)}/connections`),
+    ])
+      .then(async ([eRes, cRes]) => {
+        if (cancelled) return
+        if (eRes.status === 404) { setStatus('notfound'); return }
+        if (!eRes.ok) { setStatus('error'); return }
+        const e = await eRes.json()
+        const c = cRes.ok ? await cRes.json() : []
+        if (cancelled) return
+        setEntity(e)
+        setConnections(Array.isArray(c) ? c : [])
+        setStatus('ready')
       })
-      .filter(c => c.other)
-  }, [data, entityId])
+      .catch(() => { if (!cancelled) setStatus('error') })
+    return () => { cancelled = true }
+  }, [entityId])
 
-  const connectedIds = [entityId, ...connections.map(c => c.otherId)]
+  if (status === 'loading') return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>Loading entity…</div>
+  if (status === 'notfound') return <div style={{ padding: 40 }}>Entity not found</div>
+  if (status === 'error' || !entity) return <div style={{ padding: 40, color: 'var(--danger)' }}>Could not load this entity. Please try again.</div>
+
   const props = entity.properties
   const name = getEntityName(entity)
   const bookmarked = isBookmarked(entityId)
+  const connectedIds = [entityId, ...connections.map(c => c.entity.id)]
 
   const handleBookmark = () => {
-    if (bookmarked) {
-      setBookmarks(removeBookmark(entityId))
-    } else {
-      setBookmarks(addBookmark(entity))
-    }
+    if (bookmarked) setBookmarks(removeBookmark(entityId))
+    else setBookmarks(addBookmark(entity))
   }
 
   const handleExport = () => {
-    exportReport(entity, connections, data.entityMap)
+    exportReport(entity, connections)
   }
 
   return (
@@ -64,7 +79,7 @@ export default function EntityDetail({ data, entityId, onSelect, onGraph, bookma
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <span className={`badge badge-${entity.schema.toLowerCase()}`}>{entity.schema}</span>
             <h2 style={{ fontSize: 24 }}>{name}</h2>
-            {data.sanctionedIds?.has(entityId) && <SanctionBadge />}
+            {entity.sanctioned && <SanctionBadge />}
           </div>
           {props.alias && <div style={{ color: 'var(--text-dim)', marginTop: 4 }}>Also known as: {props.alias.join(', ')}</div>}
           {props.fraudAlias && <div style={{ color: 'var(--danger)', marginTop: 2, fontSize: 13 }}>Fraudulent aliases: {props.fraudAlias.join(', ')}</div>}
@@ -125,10 +140,10 @@ export default function EntityDetail({ data, entityId, onSelect, onGraph, bookma
           <h3 style={{ marginBottom: 12 }}>Connections ({connections.length})</h3>
           <div style={{ display: 'grid', gap: 6, maxHeight: 500, overflowY: 'auto' }}>
             {connections.map((c, i) => (
-              <div key={i} {...clickable(() => onSelect(c.otherId), `View ${getEntityName(c.other)}`)} style={{ padding: '8px 12px', background: 'var(--surface2)', borderRadius: 6, cursor: 'pointer' }}>
+              <div key={i} {...clickable(() => onSelect(c.entity.id), `View ${getEntityName(c.entity)}`)} style={{ padding: '8px 12px', background: 'var(--surface2)', borderRadius: 6, cursor: 'pointer' }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <span className={`badge badge-${c.other.schema.toLowerCase()}`} style={{ fontSize: 10 }}>{c.other.schema}</span>
-                  <span style={{ fontWeight: 500 }}>{getEntityName(c.other)}</span>
+                  <span className={`badge badge-${c.entity.schema.toLowerCase()}`} style={{ fontSize: 10 }}>{c.entity.schema}</span>
+                  <span style={{ fontWeight: 500 }}>{getEntityName(c.entity)}</span>
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>
                   {c.schema}{c.role ? `: ${c.role}` : ''}{c.relationship ? ` (${c.relationship})` : ''}
