@@ -79,17 +79,6 @@ h1, h2, h3, h4 {
   color: var(--text);
 }
 
-/* blinking cursor trailing the masthead title */
-header h1 { position: relative; }
-header h1::after {
-  content: '_';
-  color: var(--accent);
-  margin-left: 2px;
-  animation: term-blink 1.1s steps(1) infinite;
-  text-shadow: 0 0 6px var(--accent);
-}
-@keyframes term-blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
-
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; text-shadow: 0 0 6px rgba(46, 232, 106, 0.5); }
 
