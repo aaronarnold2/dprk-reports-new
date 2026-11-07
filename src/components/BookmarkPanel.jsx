@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { removeBookmark, updateBookmarkNotes } from '../utils/bookmarks'
+import { clickable } from '../utils/a11y'
 
 export default function BookmarkPanel({ bookmarks, setBookmarks, onSelect, onGraph }) {
   const [editingId, setEditingId] = useState(null)
@@ -42,7 +43,7 @@ export default function BookmarkPanel({ bookmarks, setBookmarks, onSelect, onGra
           <div key={b.id} style={{ background: 'var(--surface)', borderRadius: 8, padding: 14 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <span className={`badge badge-${b.schema.toLowerCase()}`}>{b.schema}</span>
-              <span onClick={() => onSelect(b.id)} style={{ fontWeight: 600, cursor: 'pointer', flex: 1 }}>{b.name}</span>
+              <span {...clickable(() => onSelect(b.id), `View ${b.name}`)} style={{ fontWeight: 600, cursor: 'pointer', flex: 1 }}>{b.name}</span>
               <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Added {new Date(b.addedAt).toLocaleDateString()}</span>
               <button className="secondary" onClick={() => handleEditNote(b)} style={{ padding: '2px 8px', fontSize: 12 }}>
                 {b.notes ? 'Edit Note' : 'Add Note'}

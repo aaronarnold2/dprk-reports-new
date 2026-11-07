@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react'
 import { addBookmark, removeBookmark, isBookmarked } from '../utils/bookmarks'
 import { exportReport } from '../utils/export'
-import { getEntityName } from '../utils/entity'
+import { getEntityName, safeUrl } from '../utils/entity'
+import { clickable } from '../utils/a11y'
 import SanctionBadge from './SanctionBadge'
 
 const LINK_FIELDS = new Set(['sourceUrl', 'website'])
@@ -81,7 +82,7 @@ export default function EntityDetail({ data, entityId, onSelect, onGraph, bookma
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
         <div style={{ background: 'var(--surface)', borderRadius: 8, padding: 20 }}>
           <h3 style={{ marginBottom: 12 }}>Properties</h3>
           <dl style={{ display: 'grid', gap: 10 }}>
@@ -92,12 +93,15 @@ export default function EntityDetail({ data, entityId, onSelect, onGraph, bookma
                 <dt style={{ fontSize: 12, color: 'var(--text-dim)' }}>{FIELD_LABELS[key] || key.replace(/([A-Z])/g, ' $1')}</dt>
                 <dd style={{ marginTop: 2 }}>
                   {LINK_FIELDS.has(key) ? (
-                    values.map((v, i) => (
-                      <span key={i}>
-                        {i > 0 && ', '}
-                        <a href={v} target="_blank" rel="noopener noreferrer">{v}</a>
-                      </span>
-                    ))
+                    values.map((v, i) => {
+                      const href = safeUrl(v)
+                      return (
+                        <span key={i}>
+                          {i > 0 && ', '}
+                          {href ? <a href={href} target="_blank" rel="noopener noreferrer">{v}</a> : v}
+                        </span>
+                      )
+                    })
                   ) : key === 'keywords' ? (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {values.map((v, i) => (
@@ -121,7 +125,7 @@ export default function EntityDetail({ data, entityId, onSelect, onGraph, bookma
           <h3 style={{ marginBottom: 12 }}>Connections ({connections.length})</h3>
           <div style={{ display: 'grid', gap: 6, maxHeight: 500, overflowY: 'auto' }}>
             {connections.map((c, i) => (
-              <div key={i} onClick={() => onSelect(c.otherId)} style={{ padding: '8px 12px', background: 'var(--surface2)', borderRadius: 6, cursor: 'pointer' }}>
+              <div key={i} {...clickable(() => onSelect(c.otherId), `View ${getEntityName(c.other)}`)} style={{ padding: '8px 12px', background: 'var(--surface2)', borderRadius: 6, cursor: 'pointer' }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span className={`badge badge-${c.other.schema.toLowerCase()}`} style={{ fontSize: 10 }}>{c.other.schema}</span>
                   <span style={{ fontWeight: 500 }}>{getEntityName(c.other)}</span>

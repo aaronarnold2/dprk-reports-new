@@ -71,10 +71,15 @@ function _getName(entity) {
 }
 
 function quote(str) {
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`
+  let s = str == null ? '' : String(str)
+  // Neutralize spreadsheet formula injection: a cell beginning with = + - @ (or
+  // a leading tab/CR) can execute as a formula when the CSV is opened in Excel
+  // or Google Sheets. Prefix such cells with a single quote to force text.
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`
   }
-  return str
+  return s
 }
 
 function download(content, filename, type) {
