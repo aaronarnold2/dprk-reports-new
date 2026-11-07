@@ -1,6 +1,7 @@
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react'
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
-import { getEntityName } from '../utils/entity'
+import { getEntityName, safeUrl } from '../utils/entity'
+import { clickable } from '../utils/a11y'
 import SanctionBadge from './SanctionBadge'
 
 const SCHEMA_COLORS = {
@@ -344,7 +345,7 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
           {Object.entries(SCHEMA_COLORS).filter(([s]) => nodesRef.current.some(n => n.schema === s)).map(([schema, color]) => {
             const hidden = hiddenSchemas.has(schema)
             return (
-              <span key={schema} onClick={() => toggleSchema(schema)} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 12, cursor: 'pointer', opacity: hidden ? 0.35 : 1, textDecoration: hidden ? 'line-through' : 'none', userSelect: 'none', padding: '2px 6px', borderRadius: 4, background: hidden ? 'transparent' : 'var(--surface2)' }}>
+              <span key={schema} {...clickable(() => toggleSchema(schema), `${hidden ? 'Show' : 'Hide'} ${schema} nodes`)} aria-pressed={!hidden} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 12, cursor: 'pointer', opacity: hidden ? 0.35 : 1, textDecoration: hidden ? 'line-through' : 'none', userSelect: 'none', padding: '2px 6px', borderRadius: 4, background: hidden ? 'transparent' : 'var(--surface2)' }}>
                 <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
                 {schema}
               </span>
@@ -353,8 +354,8 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
         </div>
         <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>Click node to inspect · Scroll to zoom · Drag to pan</span>
       </div>
-      <div style={{ display: 'flex', gap: 16 }}>
-        <div ref={containerRef} style={{ flex: 1, background: 'var(--surface)', borderRadius: 8, overflow: 'hidden', minWidth: 0 }}>
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div ref={containerRef} style={{ flex: 1, background: 'var(--surface)', borderRadius: 8, overflow: 'hidden', minWidth: 280 }}>
           <canvas
             ref={canvasRef}
             style={{ display: 'block', cursor: 'grab' }}
@@ -393,8 +394,8 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
                 <div key={key} style={{ marginBottom: 8 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{FIELD_LABELS[key] || key}</div>
                   <div style={{ fontSize: 13 }}>
-                    {key === 'sourceUrl' || key === 'website' ? (
-                      <a href={values[0]} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{values[0]}</a>
+                    {(key === 'sourceUrl' || key === 'website') && safeUrl(values[0]) ? (
+                      <a href={safeUrl(values[0])} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{values[0]}</a>
                     ) : key === 'country' || key === 'nationality' || key === 'flag' ? (
                       values.map(v => v.toUpperCase()).join(', ')
                     ) : key === 'description' ? (
@@ -412,10 +413,10 @@ export default function GraphView({ data, entityIds: initialEntityIds, onSelect 
                 Connections ({selectedConnections.length})
               </h4>
               {selectedConnections.slice(0, 20).map((c, i) => (
-                <div key={i} onClick={() => {
+                <div key={i} {...clickable(() => {
                   if (c.inGraph) setSelectedNode(c.otherId)
                   else onSelect(c.otherId)
-                }} style={{ padding: '6px 8px', background: 'var(--surface2)', borderRadius: 4, cursor: 'pointer', marginBottom: 4, borderLeft: c.inGraph ? '3px solid var(--accent)' : '3px solid var(--border)' }}>
+                }, `View ${getEntityName(c.other)}`)} style={{ padding: '6px 8px', background: 'var(--surface2)', borderRadius: 4, cursor: 'pointer', marginBottom: 4, borderLeft: c.inGraph ? '3px solid var(--accent)' : '3px solid var(--border)' }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <span className={`badge badge-${c.other.schema.toLowerCase()}`} style={{ fontSize: 9 }}>{c.other.schema}</span>
                     <span style={{ fontWeight: 500, fontSize: 12 }}>{getEntityName(c.other)}</span>

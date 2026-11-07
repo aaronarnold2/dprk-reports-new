@@ -10,6 +10,7 @@ import { getBaseUrl, buildOpenApiSpec, buildLlmsTxt, buildRobotsTxt } from './sr
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const app = express()
+app.disable('x-powered-by') // don't advertise the stack
 const PORT = process.env.PORT || 8080
 
 // Cloud Run runs the app behind a front-end proxy; trust the first hop so
@@ -17,6 +18,34 @@ const PORT = process.env.PORT || 8080
 // the proxy's. Trusting exactly one hop (not `true`) avoids clients spoofing
 // X-Forwarded-For to dodge the rate limit.
 app.set('trust proxy', 1)
+
+// Security headers — defense-in-depth. The app has no auth, cookies, or secrets,
+// so these mainly harden against clickjacking, MIME sniffing, and injected
+// content. The CSP is tuned to what the app actually loads: a same-origin bundle
+// and same-origin data/API fetches, inline styles (React style props + Leaflet's
+// injected CSS, hence 'unsafe-inline' in style-src), and Esri map tiles. There is
+// no inline or third-party JavaScript, so script-src stays 'self'. The inline
+// JSON-LD block is a non-executable data block and is unaffected by script-src.
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data: https://server.arcgisonline.com",
+    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self'",
+    "connect-src 'self'",
+    "font-src 'self' data:",
+  ].join('; '))
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=(), payment=(), usb=()')
+  // Honored only over HTTPS (ignored on the plain-HTTP dev origin), so safe to always send.
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains')
+  next()
+})
 
 // Origin lock — when ORIGIN_SHARED_SECRET is set, only accept requests carrying
 // the matching header (injected by Cloudflare via a Transform Rule). This blocks
@@ -159,6 +188,10 @@ app.use(express.static(join(__dirname, 'dist'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('data.json')) {
       res.setHeader('Cache-Control', 'public, max-age=86400')
+    } else if (filePath.endsWith('index.html')) {
+      // The app shell must not be cached long: a redeploy changes the hashed
+      // asset names it references, so stale HTML would point at missing bundles.
+      res.setHeader('Cache-Control', 'no-cache')
     }
   },
 }))

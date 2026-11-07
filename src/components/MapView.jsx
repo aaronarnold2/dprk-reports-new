@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react'
 import 'leaflet/dist/leaflet.css'
 import { getEntityName } from '../utils/entity'
+import { clickable } from '../utils/a11y'
 
 const COUNTRY_COORDS = {
   kp:[39.0,125.7],cn:[35.8,104.1],ru:[61.5,105.3],hk:[22.3,114.1],sg:[1.3,103.8],
@@ -145,7 +146,7 @@ export default function MapView({ data, onSelect }) {
           </div>
           <div style={{ display: 'grid', gap: 6, maxHeight: 300, overflowY: 'auto' }}>
             {selectedEntities.map(e => (
-              <div key={e.id} onClick={() => onSelect(e.id)} style={{ padding: '8px 12px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}>
+              <div key={e.id} {...clickable(() => onSelect(e.id), `View ${getEntityName(e)}`)} style={{ padding: '8px 12px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}>
                 <span className={`badge badge-${e.schema.toLowerCase()}`}>{e.schema}</span>
                 <span style={{ fontWeight: 500 }}>{getEntityName(e)}</span>
               </div>

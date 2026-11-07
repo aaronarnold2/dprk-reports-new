@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { findShortestPath } from '../utils/pathfinder'
 import { getEntityName } from '../utils/entity'
+import { clickable } from '../utils/a11y'
 
 export default function PathFinder({ data, onSelect, onGraph }) {
   const [sourceQuery, setSourceQuery] = useState('')
@@ -128,7 +129,7 @@ export default function PathFinder({ data, onSelect, onGraph }) {
                 <div key={nodeId}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', position: 'relative' }}>
                     <div style={{ position: 'absolute', left: -24, width: 16, height: 16, borderRadius: '50%', background: i === 0 || i === pathResult.nodes.length - 1 ? 'var(--accent)' : 'var(--surface2)', border: '2px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
-                    <div onClick={() => onSelect(nodeId)} style={{ flex: 1, padding: '10px 14px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <div {...clickable(() => onSelect(nodeId), `View ${getEntityName(entity)}`)} style={{ flex: 1, padding: '10px 14px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 10, alignItems: 'center' }}>
                       <span className={`badge badge-${entity.schema.toLowerCase()}`}>{entity.schema}</span>
                       <span style={{ fontWeight: 600 }}>{getEntityName(entity)}</span>
                       {entity.properties.description && (
@@ -157,7 +158,7 @@ function Dropdown({ items, onSelect }) {
   return (
     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, marginTop: 4, maxHeight: 240, overflowY: 'auto' }}>
       {items.map(e => (
-        <div key={e.id} onClick={() => onSelect(e)} style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
+        <div key={e.id} {...clickable(() => onSelect(e), `Select ${e.name}`)} style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid var(--border)' }}>
           <span className={`badge badge-${e.schema.toLowerCase()}`} style={{ fontSize: 10 }}>{e.schema}</span>
           <span style={{ fontSize: 13 }}>{e.name}</span>
         </div>

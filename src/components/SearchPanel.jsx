@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { exportCSV, exportJSON } from '../utils/export'
 import { getEntityName } from '../utils/entity'
+import { clickable } from '../utils/a11y'
 import SanctionBadge from './SanctionBadge'
 
 const DATE_FIELDS = ['date', 'birthDate', 'startDate', 'incorporationDate']
@@ -90,16 +91,17 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
       <div style={{ display: 'flex', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
         <input
           type="text"
+          aria-label="Search entities"
           placeholder={showAdvanced ? 'e.g. name:Kim AND nationality:kp OR description:KOMID' : 'Search names, aliases, descriptions...'}
           value={query}
           onChange={e => setQuery(e.target.value)}
           style={{ flex: 1, minWidth: 300 }}
         />
-        <select value={schemaFilter} onChange={e => setSchemaFilter(e.target.value)}>
+        <select aria-label="Filter by entity type" value={schemaFilter} onChange={e => setSchemaFilter(e.target.value)}>
           <option value="">All Types</option>
           {schemas.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={countryFilter} onChange={e => setCountryFilter(e.target.value)}>
+        <select aria-label="Filter by country" value={countryFilter} onChange={e => setCountryFilter(e.target.value)}>
           <option value="">All Countries</option>
           {countries.map(([c, n]) => <option key={c} value={c}>{c.toUpperCase()} ({n})</option>)}
         </select>
@@ -107,9 +109,9 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <label style={{ fontSize: 12, color: 'var(--text-dim)' }}>Date from</label>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} />
+        <input type="date" aria-label="Date from" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} />
         <label style={{ fontSize: 12, color: 'var(--text-dim)' }}>to</label>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} />
+        <input type="date" aria-label="Date to" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ fontSize: 12, padding: '4px 8px' }} />
         {(dateFrom || dateTo) && (
           <button className="secondary" onClick={() => { setDateFrom(''); setDateTo('') }} style={{ fontSize: 12, padding: '4px 8px' }}>Clear dates</button>
         )}
@@ -158,7 +160,7 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
 
       <div style={{ display: 'grid', gap: 6 }}>
         {paged.map(e => (
-          <div key={e.id} onClick={() => onSelect(e.id)} style={{ padding: '10px 14px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'flex-start', borderLeft: e._sanctioned ? '3px solid var(--danger)' : '3px solid transparent' }}>
+          <div key={e.id} {...clickable(() => onSelect(e.id), `View ${getEntityName(e)}`)} style={{ padding: '10px 14px', background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', display: 'flex', gap: 12, alignItems: 'flex-start', borderLeft: e._sanctioned ? '3px solid var(--danger)' : '3px solid transparent' }}>
             <span className={`badge badge-${e.schema.toLowerCase()}`}>{e.schema}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

@@ -36,7 +36,7 @@ export default function Dashboard({ data, onSelect, onGraph }) {
         <StatCard label="Events" value={(stats.byCat.Event || 0).toLocaleString()} color="var(--event)" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
         <div style={{ background: 'var(--surface)', borderRadius: 8, padding: 20 }}>
           <h3 style={{ marginBottom: 16 }}>Entity Types</h3>
           {Object.entries(stats.byCat).sort((a, b) => b[1] - a[1]).map(([schema, count]) => (

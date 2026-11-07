@@ -1,3 +1,12 @@
+// Returns the URL only if it is a plain http(s) link, else null. Dataset values
+// are rendered as clickable <a href> in places; React does not block
+// `javascript:`/`data:` URLs in href, so validate the scheme before linking.
+export function safeUrl(value) {
+  if (typeof value !== 'string') return null
+  const v = value.trim()
+  return /^https?:\/\//i.test(v) ? v : null
+}
+
 export function getEntityName(entity) {
   if (!entity) return 'Unknown'
   const p = entity.properties
