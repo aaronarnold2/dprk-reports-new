@@ -40,6 +40,12 @@ const FIELD_LABELS = {
 
 const DEFAULT_HEIGHT = 600
 
+// Node radius scales with degree (connection count) so hubs read as hubs at a
+// glance. sqrt keeps very high-degree nodes from ballooning; clamped both ends.
+function nodeRadius(n) {
+  return 4 + Math.min(9, Math.sqrt(n.degree || 0) * 1.5)
+}
+
 export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
   const canvasRef = useRef()
   const containerRef = useRef()
@@ -163,6 +169,15 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
       .filter(e => nodeSet.has(e.source) && nodeSet.has(e.target))
       .map(e => ({ source: e.source, target: e.target }))
 
+    // Degree per node, computed before forceLink mutates link.source/target from
+    // ids into node references.
+    const degree = {}
+    links.forEach(l => {
+      degree[l.source] = (degree[l.source] || 0) + 1
+      degree[l.target] = (degree[l.target] || 0) + 1
+    })
+    nodes.forEach(n => { n.degree = degree[n.id] || 0 })
+
     nodesRef.current = nodes
     linksRef.current = links
 
@@ -221,7 +236,7 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
       if (n.x == null || hiddenSchemas.has(n.schema)) return
       const isSelected = n.id === selectedNode
       const isHovered = n.id === hoveredNode
-      const r = (isSelected ? 8 : 6) / transform.k
+      const r = (nodeRadius(n) + (isSelected ? 2 : 0)) / transform.k
 
       if (n.sanctioned) {
         ctx.beginPath()
@@ -264,10 +279,10 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
 
   const getNodeAt = useCallback((sx, sy) => {
     const { x, y } = screenToWorld(sx, sy)
-    const hitRadius = 10 / transform.k
     for (let i = nodesRef.current.length - 1; i >= 0; i--) {
       const n = nodesRef.current[i]
       if (n.x == null || hiddenSchemas.has(n.schema)) continue
+      const hitRadius = nodeRadius(n) + 4
       const dx = n.x - x
       const dy = n.y - y
       if (dx * dx + dy * dy < hitRadius * hitRadius) return n
@@ -337,6 +352,18 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
     })
   }, [])
 
+  const exportPNG = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    try {
+      const url = canvas.toDataURL('image/png')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'dprk-network-graph.png'
+      a.click()
+    } catch { /* toDataURL can throw if the canvas is tainted; nothing is drawn from cross-origin here, so this is defensive only */ }
+  }, [])
+
   const selectedNodeObj = graph.nodes.find(n => n.id === selectedNode)
 
   return (
@@ -345,6 +372,9 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
         <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>
           {loading ? 'Loading graph…' : `${nodesRef.current.length} nodes · ${linksRef.current.length} edges`}
         </span>
+        <button className="secondary" onClick={exportPNG} disabled={loading || !nodesRef.current.length} style={{ fontSize: 12, padding: '4px 10px' }}>
+          Export PNG
+        </button>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {Object.entries(SCHEMA_COLORS).filter(([s]) => nodesRef.current.some(n => n.schema === s)).map(([schema, color]) => {
             const hidden = hiddenSchemas.has(schema)
@@ -356,7 +386,7 @@ export default function GraphView({ entityIds: initialEntityIds, onSelect }) {
             )
           })}
         </div>
-        <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>Click node to inspect · Scroll to zoom · Drag to pan</span>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 'auto' }}>Node size = connections · Click to inspect · Scroll to zoom · Drag to pan</span>
       </div>
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <div ref={containerRef} style={{ flex: 1, background: 'var(--surface)', borderRadius: 8, overflow: 'hidden', minWidth: 280 }}>

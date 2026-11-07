@@ -30,6 +30,7 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(0)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [sanctionedOnly, setSanctionedOnly] = useState(false)
   const PAGE_SIZE = 50
 
   useEffect(() => {
@@ -67,11 +68,14 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
     return Object.entries(c).sort((a, b) => b[1] - a[1])
   }, [searchable])
 
+  const queryTerms = useMemo(() => extractTerms(query), [query])
+
   const results = useMemo(() => {
     setPage(0)
     const q = query.trim()
-    return searchable.filter(e => {
+    const filtered = searchable.filter(e => {
       if (schemaFilter && e.schema !== schemaFilter) return false
+      if (sanctionedOnly && !e._sanctioned) return false
       if (countryFilter) {
         const cts = [...(e.properties.country || []), ...(e.properties.nationality || [])]
         if (!cts.includes(countryFilter)) return false
@@ -81,7 +85,15 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
       if (!q) return true
       return matchQuery(q, e)
     })
-  }, [query, schemaFilter, countryFilter, dateFrom, dateTo, searchable])
+    // Rank matches by how well the query hits the name/aliases so the most
+    // relevant entity (an exact or leading name match) rises to the top instead
+    // of relying on raw dataset order. No query → keep dataset order.
+    if (!q) return filtered
+    return filtered
+      .map(e => ({ e, score: scoreEntity(queryTerms, e) }))
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.e)
+  }, [query, schemaFilter, countryFilter, sanctionedOnly, dateFrom, dateTo, searchable, queryTerms])
 
   const paged = results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
   const totalPages = Math.ceil(results.length / PAGE_SIZE)
@@ -105,6 +117,10 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
           <option value="">All Countries</option>
           {countries.map(([c, n]) => <option key={c} value={c}>{c.toUpperCase()} ({n})</option>)}
         </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: sanctionedOnly ? 'var(--danger)' : 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+          <input type="checkbox" checked={sanctionedOnly} onChange={e => setSanctionedOnly(e.target.checked)} style={{ width: 'auto', padding: 0, margin: 0 }} />
+          Sanctioned only
+        </label>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -164,11 +180,12 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
             <span className={`badge badge-${e.schema.toLowerCase()}`}>{e.schema}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <span style={{ fontWeight: 600 }}>{getEntityName(e)}</span>
+                <span style={{ fontWeight: 600 }}><Highlight text={getEntityName(e)} terms={queryTerms} /></span>
                 {e._sanctioned && <SanctionBadge size="small" />}
               </div>
-              {e.properties.alias && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>aka: {e.properties.alias.join(', ')}</div>}
-              {e.properties.description && <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.properties.description[0]}</div>}
+              {e.properties.alias && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>aka: <Highlight text={e.properties.alias.join(', ')} terms={queryTerms} /></div>}
+              {e.schema === 'Vessel' && <VesselLine props={e.properties} />}
+              {e.properties.description && <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><Highlight text={e.properties.description[0]} terms={queryTerms} /></div>}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
               {(e.properties.country || e.properties.nationality || []).map(c => c.toUpperCase()).join(', ')}
@@ -183,6 +200,75 @@ export default function SearchPanel({ data, onSelect, onGraph, searchState, onSe
           <button className="secondary" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next</button>
         </div>
       )}
+    </div>
+  )
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Pull the plain search terms out of a query (simple or operator syntax) for
+// ranking and highlighting: drop AND/OR/NOT, keep the value half of field:value.
+function extractTerms(query) {
+  if (!query) return []
+  return query
+    .replace(/\b(AND|OR|NOT)\b/gi, ' ')
+    .split(/\s+/)
+    .map(tok => {
+      const m = tok.match(/^\w+:(.+)$/)
+      return (m ? m[1] : tok).toLowerCase().trim()
+    })
+    .filter(t => t.length >= 2)
+}
+
+function scoreEntity(terms, entity) {
+  if (!terms.length) return 0
+  const name = (getEntityName(entity) || '').toLowerCase()
+  const aliases = (entity.properties.alias || []).join(' ').toLowerCase()
+  let score = 0
+  for (const t of terms) {
+    if (name === t) score += 100
+    else if (name.startsWith(t)) score += 60
+    else if (new RegExp('\\b' + escapeRegExp(t)).test(name)) score += 40
+    else if (name.includes(t)) score += 30
+    else if (aliases.includes(t)) score += 18
+    else score += 5 // matched on some other field only
+  }
+  if (entity._sanctioned) score += 4 // nudge designated entities up on ties
+  return score
+}
+
+function Highlight({ text, terms }) {
+  if (text == null) return null
+  const str = String(text)
+  if (!terms || !terms.length) return str
+  const re = new RegExp('(' + terms.map(escapeRegExp).join('|') + ')', 'gi')
+  const wanted = new Set(terms.map(t => t.toLowerCase()))
+  return str.split(re).map((part, i) =>
+    wanted.has(part.toLowerCase())
+      ? <mark key={i} style={{ background: 'var(--accent-dim)', color: 'var(--accent)', padding: 0 }}>{part}</mark>
+      : part,
+  )
+}
+
+function VesselLine({ props }) {
+  const up = arr => arr.map(v => v.toUpperCase()).join(', ')
+  const bits = []
+  if (props.imoNumber) bits.push(['IMO', props.imoNumber.join(', '), false])
+  if (props.mmsi) bits.push(['MMSI', props.mmsi.join(', '), false])
+  if (props.flag) bits.push(['FLAG', up(props.flag), false])
+  if (props.fraudImoNumber) bits.push(['FRAUD IMO', props.fraudImoNumber.join(', '), true])
+  if (props.fraudMmsi) bits.push(['FRAUD MMSI', props.fraudMmsi.join(', '), true])
+  if (props.fraudFlag) bits.push(['FRAUD FLAG', up(props.fraudFlag), true])
+  if (!bits.length) return null
+  return (
+    <div style={{ fontSize: 12, marginTop: 3, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      {bits.map(([k, v, fraud], i) => (
+        <span key={i} style={{ color: fraud ? 'var(--danger)' : 'var(--text-dim)' }}>
+          <span style={{ opacity: 0.6 }}>{k}</span> {v}
+        </span>
+      ))}
     </div>
   )
 }

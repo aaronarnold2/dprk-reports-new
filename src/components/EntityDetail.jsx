@@ -62,6 +62,11 @@ export default function EntityDetail({ entityId, onSelect, onGraph, bookmarks, s
   const name = getEntityName(entity)
   const bookmarked = isBookmarked(entityId)
   const connectedIds = [entityId, ...connections.map(c => c.entity.id)]
+  // The sanctioned flag is derived from a Sanction edge; surface the linked
+  // Sanction record's designation details (authority, program, date, UNSC ID).
+  const sanctionProps = entity.sanctioned
+    ? connections.find(c => c.entity.schema === 'Sanction')?.entity.properties
+    : null
 
   const handleBookmark = () => {
     if (bookmarked) setBookmarks(removeBookmark(entityId))
@@ -97,6 +102,39 @@ export default function EntityDetail({ entityId, onSelect, onGraph, bookmarks, s
         </div>
       </div>
 
+      {sanctionProps && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--danger)', borderRadius: 8, padding: '14px 18px', marginBottom: 24 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+            <SanctionBadge />
+            <strong style={{ letterSpacing: '0.04em' }}>UN Sanctions Designation</strong>
+          </div>
+          <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+            {[
+              ['UNSC ID', sanctionProps.unscId],
+              ['Authority', sanctionProps.authority],
+              ['Designated', sanctionProps.date],
+              ['Record', sanctionProps.recordId],
+            ].filter(([, v]) => v && v.length).map(([label, v]) => (
+              <div key={label}>
+                <dt style={{ fontSize: 12, color: 'var(--text-dim)' }}>{label}</dt>
+                <dd style={{ marginTop: 2 }}>{v.join(', ')}</dd>
+              </div>
+            ))}
+          </dl>
+          {sanctionProps.program?.[0] && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Program / Basis</div>
+              <div style={{ marginTop: 2, fontSize: 13, lineHeight: 1.5 }}>{sanctionProps.program.join('; ')}</div>
+            </div>
+          )}
+          {sanctionProps.sourceUrl?.[0] && safeUrl(sanctionProps.sourceUrl[0]) && (
+            <div style={{ marginTop: 10 }}>
+              <a href={safeUrl(sanctionProps.sourceUrl[0])} target="_blank" rel="noopener noreferrer">View source document →</a>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24 }}>
         <div style={{ background: 'var(--surface)', borderRadius: 8, padding: 20 }}>
           <h3 style={{ marginBottom: 12 }}>Properties</h3>
@@ -106,8 +144,10 @@ export default function EntityDetail({ entityId, onSelect, onGraph, bookmarks, s
               .map(([key, values]) => (
               <div key={key}>
                 <dt style={{ fontSize: 12, color: 'var(--text-dim)' }}>{FIELD_LABELS[key] || key.replace(/([A-Z])/g, ' $1')}</dt>
-                <dd style={{ marginTop: 2 }}>
-                  {LINK_FIELDS.has(key) ? (
+                <dd style={{ marginTop: 2, ...(key.startsWith('fraud') ? { color: 'var(--danger)' } : null) }}>
+                  {key.startsWith('fraud') ? (
+                    (key === 'fraudFlag' ? values.map(v => v.toUpperCase()) : values).join(', ')
+                  ) : LINK_FIELDS.has(key) ? (
                     values.map((v, i) => {
                       const href = safeUrl(v)
                       return (
